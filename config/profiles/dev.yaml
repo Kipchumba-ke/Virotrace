@@ -1,0 +1,28 @@
+# Dev profile: CI and first-run smoke. Must finish in minutes, no network.
+scope: kenya
+threads: 2
+
+acquire:
+  sources: [fixture]
+
+subsample:
+  max_per_stratum: 5
+
+phylo:
+  tree:
+    model: GTR
+    bootstrap: none
+    fast_mode: true
+  refine:
+    enabled: false
+  clusters:
+    enabled: false
+
+prevalence:
+  # Fixtures are tiny. NEVER copy this into a real profile -- it disables the
+  # small-denominator suppression that keeps the report honest.
+  min_stratum_n: 1
+
+report:
+  min_stratum_n: 1
+  figures: [prevalence_by_class, qc_waterfall]

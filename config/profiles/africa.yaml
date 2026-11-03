@@ -1,0 +1,18 @@
+# Context build: Africa-wide. Overnight run on a laptop.
+scope: africa
+threads: 4
+
+subsample:
+  enabled: true
+  max_per_stratum: 25
+
+phylo:
+  tree:
+    fast_mode: true
+    replicates: 200
+
+prevalence:
+  min_stratum_n: 15
+
+report:
+  min_stratum_n: 15
