@@ -1,0 +1,119 @@
+Metadata-Version: 2.4
+Name: virotrace
+Version: 0.1.0
+Summary: HIV-1 drug-resistance and lineage phylogenomic surveillance for Kenya and Africa
+Author: Kipchumba
+License: MIT
+Keywords: hiv,bioinformatics,phylogenetics,drug-resistance,nextstrain
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pydantic>=2.6
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: typer>=0.12
+Requires-Dist: pandas>=2.2
+Requires-Dist: biopython>=1.83
+Requires-Dist: matplotlib>=3.8
+Requires-Dist: jinja2>=3.1
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: hypothesis>=6.100; extra == "dev"
+Requires-Dist: ruff>=0.5; extra == "dev"
+Requires-Dist: mypy>=1.10; extra == "dev"
+Requires-Dist: pandera>=0.20; extra == "dev"
+Requires-Dist: jsonschema>=4.22; extra == "dev"
+Requires-Dist: pre-commit>=3.7; extra == "dev"
+Requires-Dist: types-PyYAML; extra == "dev"
+Dynamic: license-file
+
+# Virotrace
+
+Reproducible HIV-1 molecular surveillance for **Kenya**, in an **Africa-wide** context:
+genotypic drug-resistance surveillance and lineage phylogenomics over the same curated
+corpus of publicly deposited *pol* sequences, with a Nextstrain/Auspice build and a
+resistance report as outputs.
+
+> **Not a clinical tool.** Virotrace produces population-level descriptive statistics from
+> public sequence data. No output should be used to inform the care of any individual
+> patient.
+
+---
+
+## What it does
+
+| Layer | Question | Output |
+|---|---|---|
+| **DRM** | Which resistance mutations are present in deposited Kenyan HIV-1 *pol* sequences, at what prevalence, in which drug classes, and how does that compare with the wider region? | `results/<scope>/drm/prevalence.tsv`, resistance report |
+| **Phylo** | What subtypes and recombinant forms are represented, how are they structured, and what does a time-resolved tree with geographic traits show? | `auspice/virotrace_<scope>_pol.json` |
+
+The two layers meet at a file contract (`drm_table.tsv`), not a code dependency, so
+resistance mutations appear as colourings on the tree without either layer importing the
+other.
+
+## Quickstart
+
+```bash
+git clone <this-repo> && cd virotrace
+make setup && conda activate virotrace
+
+virotrace info                     # resolved versions of every external binary
+make dag                           # validate the DAG and all three profiles, run nothing
+make test                          # fast suite, under a minute
+make dev                           # toy build end to end, minutes, no network
+```
+
+Then the real builds:
+
+```bash
+make kenya                         # primary build
+make africa CORES=4                # context build; long, resumable
+```
+
+## Scope and honesty about the data
+
+Public HIV sequences from Kenya are a **convenience sample**, clustered by study, site and
+era. Every prevalence figure describes *deposited sequences*, not the Kenyan epidemic, and
+carries its denominator. Three further limits are built into the design rather than noted
+afterwards:
+
+- **Geographic resolution is country-level for most records.** Subnational reconstruction
+  runs only when enough records genuinely supply a location, and the map legend states the
+  resolved fraction. No invented county assignments.
+- **Treatment status is unknown for most records**, and is never inferred from the presence
+  of mutations — that would be circular. So pretreatment and acquired resistance cannot be
+  cleanly separated in v1.
+- **Recombinants leave the tree but stay in the resistance layer.** Recombination
+  invalidates a phylogeny, not a genotype. The excluded fraction is reported in both outputs.
+
+The full list is in [`docs/04-bioinformatics-methodology.md`](docs/04-bioinformatics-methodology.md#9-stated-limitations-to-be-carried-verbatim-into-the-report),
+and the report cannot be generated without it.
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [01 Technical specification](docs/01-technical-specification.md) | Scope, requirements, compute envelope, milestones, risks |
+| [02 System architecture](docs/02-system-architecture.md) | Layers, DAG, data contracts, technology rationale, scale-up points |
+| [03 Data acquisition](docs/03-data-acquisition.md) | Sources, access tiers, metadata schema, cohort and subsampling design |
+| [04 Bioinformatics methodology](docs/04-bioinformatics-methodology.md) | QC, alignment, subtyping, recombination, DRM calling, prevalence, phylogenetics |
+| [05 Software architecture](docs/05-software-architecture.md) | Repository structure, module boundaries, CLI, error handling |
+| [06 Configuration](docs/06-configuration.md) | The config file, profiles, validation, what is deliberately not configurable |
+| [07 Testing strategy](docs/07-testing-strategy.md) | Positive and negative controls, invariants, golden files, CI |
+
+## Project status
+
+Phase 0 — scaffold. The configuration layer, QC rules, mutation model, prevalence
+estimation, subsampling, hypermutation screen and temporal gate are implemented and
+tested; acquisition, alignment, subtyping, recombination, tree inference and export are
+scaffolded CLI stages that exit with a pointer to the phase they land in.
+
+Before any result is reported, two files must be replaced:
+`config/reference/sdrm_who.PLACEHOLDER.tsv` with the authoritative WHO surveillance
+mutation list, and `config/reference/hxb2.gb` with the pinned HXB2 record (which switches
+on the skipped coordinate test).
+
+## Licence
+
+MIT. Sequence data is used under each source's terms and is not redistributed in bulk —
+the snapshot manifests record the exact queries so the corpus can be rebuilt.

@@ -1,0 +1,120 @@
+# ─── Sequence data ────────────────────────────────────────────────────────────
+# Nothing under data/ is committed EXCEPT snapshot manifests. The manifests are
+# what make a corpus rebuildable from this repo, so they must survive the ignore.
+#
+# Why the three negations: once a directory is ignored, git never descends into
+# it, so re-including a file deep inside also means re-including every parent
+# directory. `data/*` plus `!data/raw/**/manifest.json` silently ignores the
+# manifests -- verified with `git check-ignore`.
+/data/**
+!/data/.gitkeep
+!/data/raw/
+!/data/raw/**/
+!/data/raw/**/manifest.json
+
+# Stray sequence dumps at the repo root (fixtures under tests/ are unaffected).
+/*.fasta
+/*.fa
+/*.fastq
+/*.gb
+/*.sam
+/*.bam
+
+# ─── Derived outputs ──────────────────────────────────────────────────────────
+# All regenerable from a snapshot + a config. Nothing here is a source artifact.
+/results/
+/auspice/
+/reports/
+/logs/
+.snakemake/
+
+# ─── Secrets ──────────────────────────────────────────────────────────────────
+# config.yaml leaves `acquire.email` null on purpose; the value and any NCBI API
+# key arrive from the environment, never from a committed file.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.yaml
+.netrc
+
+# ─── Bioinformatics tool byproducts ───────────────────────────────────────────
+# IQ-TREE writes a dozen sibling files next to its alignment. The tree itself is
+# an declared rule output under results/; these are scratch.
+*.ckp.gz
+*.iqtree
+*.treefile
+*.contree
+*.ufboot
+*.splits.nex
+*.mldist
+*.bionj
+*.model.gz
+*.parstree
+*.uniqueseq.phy
+# MAFFT / augur / treetime scratch
+*.mafft.tmp
+_trash/
+# 3SEQ
+*.3s.log
+*.3s.rec
+*.3s.pvalHist
+# Auspice local install
+node_modules/
+.cache/
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.conda/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit.xml
+.tox/
+
+# Scale-up path (docs/02 section 7): a local query layer is a cache, not a source.
+*.duckdb
+*.sqlite
+*.sqlite3
+
+# ─── Notebooks ────────────────────────────────────────────────────────────────
+# notebooks/ is exploratory and committed, but run nbstripout before committing:
+#   pip install nbstripout && nbstripout --install
+.ipynb_checkpoints/
+
+# ─── Editors / OS ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.direnv/
+.DS_Store
+Thumbs.db
+desktop.ini
+*:Zone.Identifier
+
+# ─── Merge / patch debris ─────────────────────────────────────────────────────
+*.orig
+*.rej
+*.bak
+
+# ─── Deliberately NOT ignored ─────────────────────────────────────────────────
+# environment.lock.yml        pinned env is the reproducibility anchor
+# config/reference/*          pinned reference data (HXB2, SDRM list, panels)
+# tests/fixtures/*            synthetic sequences, no real patient data
+# tests/regression/golden/*   regression baselines; a refresh must show in a diff
+# data/raw/**/manifest.json   the queries that rebuild a snapshot
