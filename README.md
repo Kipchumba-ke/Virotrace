@@ -25,7 +25,7 @@ other.
 ## Quickstart
 
 ```bash
-git clone <this-repo> && cd virotrace
+git clone https://github.com/Kipchumba-ke/Virotrace && cd virotrace
 make setup && conda activate virotrace
 
 virotrace info                     # resolved versions of every external binary
