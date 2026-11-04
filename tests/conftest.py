@@ -22,6 +22,11 @@ def repo_root() -> Path:
 
 
 @pytest.fixture(scope="session")
+def records_toy_tsv() -> Path:
+    return FIXTURES / "records_toy.tsv"
+
+
+@pytest.fixture(scope="session")
 def config_path() -> Path:
     return REPO_ROOT / "config" / "config.yaml"
 

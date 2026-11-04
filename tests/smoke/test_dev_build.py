@@ -61,9 +61,7 @@ def test_dev_build_completes_and_is_reproducible(repo_root: Path) -> None:
     for relative in DETERMINISTIC_OUTPUTS:
         path = repo_root / relative
         assert path.exists() and path.stat().st_size > 0, f"missing or empty: {relative}"
-        assert (
-            Path(f"{path}.provenance.json").exists()
-        ), f"no provenance sidecar for {relative}"
+        assert Path(f"{path}.provenance.json").exists(), f"no provenance sidecar for {relative}"
         checksums[relative] = _sha256(path)
 
     report = repo_root / "reports/kenya/index.html"
