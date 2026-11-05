@@ -17,7 +17,7 @@ is the secondary per-sequence view.
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..errors import ContractError
@@ -29,6 +29,10 @@ class SDRMList:
     version: str
     #: (gene, position) -> set of resistance-conferring residues
     entries: dict[tuple[str, int], frozenset[str]]
+    #: (gene, position) -> insertion/deletion events on the list, e.g. {"Del"}. Recorded
+    #: so nothing in the source table is lost; the point-mutation caller does not detect
+    #: indels yet, so these do not affect ``is_sdrm`` and prevalence omits them.
+    indels: dict[tuple[str, int], frozenset[str]] = field(default_factory=dict)
 
     def is_sdrm(self, mutation: Mutation) -> bool:
         residues = self.entries.get((mutation.gene, mutation.position))
@@ -56,6 +60,7 @@ def load_sdrm_list(path: Path | str, version: str) -> SDRMList:
         raise ContractError(f"SDRM list not found: {path}")
 
     entries: dict[tuple[str, int], frozenset[str]] = {}
+    indels: dict[tuple[str, int], frozenset[str]] = {}
     with path.open(newline="") as handle:
         # csv.DictReader has no comment support, and a '#' header line would
         # otherwise be read as a data row with gene='# ...'.
@@ -78,7 +83,10 @@ def load_sdrm_list(path: Path | str, version: str) -> SDRMList:
                 )
             residues = frozenset(row["residues"].strip().upper())
             entries[(gene, position)] = entries.get((gene, position), frozenset()) | residues
+            found = frozenset(x.strip() for x in (row.get("indels") or "").split(",") if x.strip())
+            if found:
+                indels[(gene, position)] = indels.get((gene, position), frozenset()) | found
 
     if not entries:
         raise ContractError(f"SDRM list {path} is empty")
-    return SDRMList(version=version, entries=entries)
+    return SDRMList(version=version, entries=entries, indels=indels)

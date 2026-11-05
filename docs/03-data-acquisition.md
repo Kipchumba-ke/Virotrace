@@ -77,7 +77,8 @@ One table, one row per retained sequence. `*` = required.
 | `hypermutation_flag` | bool | — | APOBEC-context G→A screen result |
 | `qc_status`* | enum | `pass` \| `excluded` \| `quarantined` | |
 | `qc_reason` | string | rule ID | Null iff `pass` |
-| `treatment_status` | enum | `naive` \| `experienced` \| `unknown` | **Default `unknown`.** Only populated from an explicit statement in the record — never inferred from mutations, which would be circular |
+| `treatment_status` | enum | `naive` \| `experienced` \| `unknown` | **Default `unknown`.** Read only from an explicit statement in the record's own text (title, definition, notes) by keyword (`curate/study.py`); contradictory statements stay `unknown`. Never inferred from mutations, which would be circular. A keyword hint, not clinical metadata |
+| `study_key` | string | `PMID:…` \| `BP:…` \| `REF:author\|title` \| `unknown_study` | Groups records of one study; used by `study_summary.tsv` to show when a stratum is one study |
 | `snapshot_id`* | string | — | Provenance |
 
 `treatment_status` deserves emphasis: the temptation to infer treatment exposure from the presence of

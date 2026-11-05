@@ -1,0 +1,32 @@
+LOCUS       KE100001                 60 bp    RNA     linear   VRL 12-MAR-2016
+DEFINITION  HIV-1 isolate K1 from Kenya pol protein (pol) gene, partial cds.
+ACCESSION   KE100001
+VERSION     KE100001.1
+FEATURES             Location/Qualifiers
+     source          1..60
+                     /organism="Human immunodeficiency virus 1"
+                     /isolate="K1"
+                     /host="Homo sapiens"
+                     /country="Kenya: Nairobi"
+                     /collection_date="12-Mar-2015"
+                     /note="subtype: A1; obtained from a long
+                     wrapped note line"
+     CDS             <1..>60
+                     /gene="pol"
+ORIGIN
+        1 acgtacgtac gtacgtacgt acgtacgtac gtacgtacgt acgtacgtac gtacgtacgt
+//
+LOCUS       KE100002                 60 bp    RNA     linear   VRL 12-MAR-2016
+DEFINITION  HIV-1 isolate K2 from Kenya.
+ACCESSION   KE100002
+VERSION     KE100002.1
+FEATURES             Location/Qualifiers
+     source          1..60
+                     /organism="Human immunodeficiency virus 1"
+                     /isolate="K2"
+                     /country="Kenya"
+     CDS             <1..>60
+                     /gene="pol"
+ORIGIN
+        1 tgcatgcatg catgcatgca tgcatgcatg catgcatgca tgcatgcatg catgcatgca
+//

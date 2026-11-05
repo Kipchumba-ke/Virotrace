@@ -95,7 +95,14 @@ qc:
     enabled: true                # QC-5
     p_threshold: 0.05
     action: exclude              # exclude | flag_only
+  min_identity_to_reference: 0.75  # QC-0: below this the sequence is not pol
+  min_class_position_coverage: 1.0 # QC-1: share of a class's SDRM positions covered
   exclude_lab_strains: true      # QC-7
+  clone_policy: exclude          # exclude | keep_all: clone-derived records leave the
+  individual_policy: one_per_individual   # keep_all | one_per_individual: one sequence per
+                                          # identifiable person (earliest, least ambiguous)
+  individual_id_patterns: ['^(RV217_\d+)_']  # regexes on the isolate name; group 1 = person id
+                                 # prevalence and tree layers, stay in the DRM table
   lab_strain_list: lab_strains.txt
   max_record_error_rate: 0.25    # abort if more than this fraction quarantines
 
@@ -135,7 +142,9 @@ drm:
     policy: any                  # any | majority | strict
   sdrm:
     list: sdrm_who.tsv
-    list_version: "2009"
+    list_version: "2009"         # headline prevalence list (original WHO 2009)
+    sensitivity_list: sdrm_stanford_2026-09-25.tsv   # optional; reported separately with its
+    sensitivity_list_version: "stanford-2026-09-25"  # own denominators, never the headline
   cross_check:
     enabled: false               # optional external re-call
     cache: true
@@ -148,6 +157,8 @@ prevalence:
   ci_level: 0.95
   min_stratum_n: 10              # below this: "n too small", not a plotted point
   trend_test: cochran_armitage
+  study_annotations: study_annotations.tsv   # hand-curated study_key -> treatment context
+  year_bin_width: 5              # bins start at multiples of this: 2000-2004, 2005-2009, ...
 
 phylo:
   enabled: true                  # false ships the DRM-only build

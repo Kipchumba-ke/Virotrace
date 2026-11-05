@@ -1,0 +1,5 @@
+# Laboratory reference strains: not epidemiological samples, excluded by QC-7.
+# One strain id per line (the canonical id is the GenBank accession). Extend this list
+# with the lab-strain accessions you identify; clone-derived records are flagged
+# separately by qc.clone_policy.
+K03455

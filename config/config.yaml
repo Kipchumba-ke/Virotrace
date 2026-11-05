@@ -39,7 +39,10 @@ reference:
     in: [4230, 5093]
 
 acquire:
-  sources: [genbank, lanl]
+  # LANL has no clean API; its adapter is not implemented yet, so it is left out
+  # rather than listed and failing.
+  sources: [genbank]
+  fixture_path: tests/fixtures/records_toy.tsv   # used when sources includes 'fixture'
   min_length: 1000
   max_length: 10000
   email: null
@@ -67,8 +70,13 @@ qc:
     enabled: true
     p_threshold: 0.05
     action: exclude
+  min_identity_to_reference: 0.75   # below this a sequence is not pol (see qc_summary.json)
+  min_class_position_coverage: 1.0  # share of a class's SDRM positions that must be covered
   exclude_lab_strains: true
   lab_strain_list: lab_strains.txt
+  individual_policy: one_per_individual   # keep_all | one_per_individual (see docs)
+  individual_id_patterns: ['^(RV217_\d+)_']   # group 1 = person id, matched on the isolate name
+  clone_policy: exclude          # exclude | keep_all; see docs/06-configuration.md
   max_record_error_rate: 0.25
 
 align:
@@ -76,19 +84,30 @@ align:
   reference_anchored: true
   codon_aware: true
   mask_gap_frac: 0.90
+  chunk_size: 500                # sequences per MAFFT call (each aligned to HXB2 only)
 
 subtype:
-  methods: [placement, external]
-  reference_panel: subtype_references.fasta
-  min_support: 0.70
+  methods: [placement]           # an external second call is planned; until then the
+                                 # depositor's label is compared and disagreement reported
+  reference_panel: subtype_references.fasta   # LANL subtype reference sequences (you supply)
+  min_support: 0.70              # share of site bootstraps that must agree with the call
+  n_bootstrap: 100
+  exclude_labels: [CPZ, GOR, O, N, P]   # non-M references are not targets
+  include_crfs: null             # null = every CRF in the panel; or a list, e.g. [01_AE, 02_AG]
+  min_overlap_sites: 300         # comparable sites needed before any call is made
   on_disagreement: report
 
 recombination:
   enabled: true
-  method: 3seq
-  p_threshold: 0.05
-  tree_policy: exclude_confirmed
-  drm_policy: keep_all
+  method: window_scan            # sliding-window subtype scan; a screen, not 3SEQ/RDP
+  window: 300                    # alignment columns per window
+  step: 100
+  min_window_sites: 150
+  min_margin: 0.02               # nearest label must beat the next by this p-distance
+  min_segment: 400               # columns a same-label run must span to count
+  confirm_support: 0.90          # bootstrap support each segment needs for "confirmed"
+  tree_policy: exclude_confirmed # exclude_confirmed | exclude_suspected | keep_all
+  drm_policy: keep_all           # recombinants always stay in the resistance layer
 
 subsample:
   enabled: true
@@ -105,9 +124,12 @@ drm:
   require_gene_coverage: true
   mixtures:
     policy: any
+    max_ambiguous_residues: 4     # more possible residues than this = no-call
   sdrm:
     list: sdrm_who.tsv
-    list_version: "2009"
+    list_version: "2009"            # headline: the original WHO 2009 SDRM list
+    sensitivity_list: sdrm_stanford_2026-09-25.tsv   # reported separately, never the headline
+    sensitivity_list_version: "stanford-2026-09-25"
   cross_check:
     enabled: false
     cache: true
@@ -120,6 +142,8 @@ prevalence:
   ci_level: 0.95
   min_stratum_n: 10
   trend_test: cochran_armitage
+  study_annotations: study_annotations.tsv   # hand-curated treatment context per study
+  year_bin_width: 5               # bins start at multiples of this (2000-2004, 2005-2009, ...)
 
 phylo:
   enabled: true

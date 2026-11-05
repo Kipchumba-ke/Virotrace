@@ -160,7 +160,7 @@ def cochran_armitage_trend(
     if var <= 0:
         return 0.0, 1.0
     z = numer / math.sqrt(var)
-    p = 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
+    p = math.erfc(abs(z) / math.sqrt(2))  # erfc: 1 - erf underflows to 0 for large |z|
     return z, p
 
 

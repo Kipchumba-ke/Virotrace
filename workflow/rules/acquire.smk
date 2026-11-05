@@ -1,15 +1,18 @@
 """L0 -- acquisition into an immutable snapshot.
 
-data/raw is never declared as an output by any other rule; a CI check enforces that,
-which is what makes "immutable snapshot" true rather than aspirational.
+Snapshot directories are named dynamically (`<date>_<query hash>`), which Snakemake
+cannot declare as a fixed output. So the rule's declared output is a small pointer
+file, `data/raw/<scope>.current`, holding the snapshot id. Downstream rules depend on
+the pointer; the normalise stage resolves it to the snapshot directory (or uses
+`snapshot_id` from the config when pinned, for a reproducible rerun).
+
+data/raw is never written by any rule other than this one; a CI check enforces that.
 """
 
 
 rule acquire:
     output:
-        seqs=f"{PATHS['raw']}/{SCOPE}/sequences.fasta",
-        meta=f"{PATHS['raw']}/{SCOPE}/records.tsv",
-        manifest=f"{PATHS['raw']}/{SCOPE}/manifest.json",
+        pointer=f"{PATHS['raw']}/{SCOPE}.current",
     log:
         f"logs/{SCOPE}/acquire.log",
     threads: 1

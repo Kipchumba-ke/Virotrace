@@ -1,0 +1,16 @@
+# Hand-curated treatment context per study, from the papers (not from mutations).
+# treatment_context: naive | experienced | mixed | unknown.  Overrides nothing but the stratum:
+# the keyword hint never stratifies. Add a row only after reading the study; the note records why.
+study_key	treatment_context	note
+REF:Rossenkhan|bayesian-estimation-of-hiv-acquisition-d	naive	RV217 acute-infection cohort (isolates RV217_*); sampled at HIV diagnosis, before ART. Verify against the paper.
+REF:Mullins|early-evolutionary-dynamics-of-hiv-infec	naive	Title: early infection. Verify against the paper.
+REF:Otecko|viral-and-host-characteristics-of-recent	naive	Title: recent infection. Verify against the paper.
+PMID:31818716	mixed	RCT of pre-treatment resistance management by OLA; 94% of 991 ART-naive by history and pharmacy records, the rest not. Deposited sequences look resistance-selected (61% NRTI), so not counted as naive.
+PMID:32785695	mixed	Four African countries; 801 ART-naive and 171 viremic ART-experienced participants in the same paper; sequences not separable by record.
+REF:Nduva|direct-submission	mixed	Linked by submitter name to Nduva et al. (temporal trends of pre-treatment resistance, Kenya 1986-2020), whose dataset includes ART-experienced (n=1778) and unverified (n=227) people; the GenBank record has no treatment fields and 67% NRTI suggests experienced-dominated. Likely the dataset of PMID:38091580 (Nduva et al., supplied by the user), but the GenBank record carries no PubMed id, so the link is unconfirmed.
+REF:Scallon|clinical-psychosocial-and-structural-fac	experienced	Children living with HIV in Kisumu on ART (Opt4Kids RCT of ART monitoring); resistance tested because of detectable viral load.
+PMID:32027734	naive	RV217 acute-infection cohort (East Africa and Thailand) sampled at diagnosis, before ART. Records have no collection dates; isolate naming should be checked for the individual policy.
+PMID:21770741	unknown	Patients attending a rural district hospital on the Kenyan coast (2008); ART status not stated in the abstract; check Methods.
+PMID:31724034	experienced	ACTG A5288 screening: virologic failure on second-line PI-based ART with 3-class experience or resistance.
+PMID:22900472	naive	Hassan et al. 2013; ARV-naive adults enrolling at a rural Kenyan HIV clinic, two cross-sectional studies 2008-2010.
+REF:Onywera|surveillance-of-hiv-1-pol-transmitted-dr	naive	Onywera et al. 2017; drug-naive adults with acute or recent infection (AHI/RHI), rural western Kenya, 2012 household survey.

@@ -26,6 +26,17 @@ def count_corpus(rows: Iterable[Mapping[str, Any]], *, country_code: str = "KEN"
         "n_time_tree_eligible_with_year_only": (
             precision.get("day", 0) + precision.get("month", 0) + precision.get("year", 0)
         ),
+        # Where the tree's dated tips actually sit: a clock needs spread, not just a count.
+        "strict_dated_by_year": {
+            str(y): n
+            for y, n in sorted(
+                Counter(
+                    r["year"]
+                    for r in target
+                    if r["date_precision"] in ("day", "month") and r["year"] is not None
+                ).items()
+            )
+        },
         "year_range": (years[0], years[-1]) if years else None,
         "n_distinct_years": len(years),
         "by_region": dict(Counter(r["region"] for r in rows)),

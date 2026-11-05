@@ -79,39 +79,93 @@ def validate_config(
 
 
 # --------------------------------------------------------------------- stage stubs
+def _fail(exc: Exception) -> None:
+    typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
+    raise typer.Exit(code=1) from exc
+
+
 @app.command()
-def acquire(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
+def acquire(
+    config: ConfigOpt = Path("config/config.yaml"),
+    profile: ProfileOpt = None,
+    max_records: Annotated[
+        int | None,
+        typer.Option("--max-records", help="Cap the fetch for a small trial run."),
+    ] = None,
+) -> None:
     """L0: fetch sequences into an immutable snapshot with a manifest."""
-    load_settings(config, profile)
-    _not_implemented("acquire")
+    from .acquire.stage import run_acquire
+
+    settings = load_settings(config, profile)
+    try:
+        snapshot = run_acquire(settings, max_records=max_records)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.secho(f"snapshot written: {snapshot}", fg=typer.colors.GREEN)
 
 
 @app.command()
 def normalise(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
-    """L1: source records -> the validated metadata contract."""
-    load_settings(config, profile)
-    _not_implemented("normalise")
+    """L1: dedup, scope filter and validate records; prints the P1 corpus counts."""
+    from .curate.stage import run_normalise
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_normalise(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @app.command()
 def qc(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
-    """L2: QC-1..QC-7 with the exclusion ledger."""
-    load_settings(config, profile)
-    _not_implemented("qc")
+    """L2: QC rules on the aligned sequences, with the exclusion ledger and corpus recount."""
+    from .curate.qc_stage import run_qc
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_qc(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @app.command()
 def align(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
-    """L2: reference-anchored, codon-aware alignment to HXB2."""
+    """L2: align to HXB2 pol with MAFFT, projected onto reference coordinates."""
+    from .align.stage import run_align
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_align(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+
+
+@app.command()
+def mask(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
+    """L2: gap-mask the QC-passed alignment for tree inference (never for DRM calling)."""
     load_settings(config, profile)
-    _not_implemented("align")
+    _not_implemented("mask")
 
 
 @app.command()
 def subtype(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
-    """L2: two independent subtype calls, disagreement surfaced not resolved."""
-    load_settings(config, profile)
-    _not_implemented("subtype")
+    """L2: bootstrap-supported subtype placement; depositor label compared, not trusted."""
+    from .curate.subtype import run_subtype
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_subtype(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @app.command()
@@ -119,8 +173,15 @@ def recombination(
     config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
 ) -> None:
     """L2: breakpoint screen. Confirmed recombinants leave the tree, stay in DRM."""
-    load_settings(config, profile)
-    _not_implemented("recombination")
+    from .curate.recombination import run_recombination
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_recombination(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @app.command()
@@ -132,9 +193,16 @@ def subsample(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOp
 
 @drm_app.command("call")
 def drm_call(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
-    """L3a: mutation extraction and HIVdb interpretation."""
-    load_settings(config, profile)
-    _not_implemented("drm call")
+    """L3a: per-gene coverage and mutations at SDRM positions, from the pol alignment."""
+    from .drm.stage import run_drm_call
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_drm_call(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @drm_app.command("prevalence")
@@ -142,8 +210,15 @@ def drm_prevalence(
     config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
 ) -> None:
     """L3a: per-class denominators, Wilson intervals, suppression, trend."""
-    load_settings(config, profile)
-    _not_implemented("drm prevalence")
+    from .drm.prevalence_stage import run_prevalence
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_prevalence(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @phylo_app.command("tree")

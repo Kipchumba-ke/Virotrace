@@ -8,6 +8,7 @@ failure mode the RecordError/ContractError split would otherwise invite.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
@@ -17,6 +18,7 @@ from ..errors import ContractError, RecordError
 from ..io.fasta import STRAIN_RE
 from .dates import parse_collection_date
 from .geo import normalise_country
+from .study import study_key, treatment_from_text
 
 REQUIRED_FIELDS = (
     "strain",
@@ -44,6 +46,19 @@ def canonical_strain(accession: str) -> str:
     if not STRAIN_RE.match(strain):
         raise RecordError(f"cannot form a strain id from {accession!r}", rule="N-1")
     return strain
+
+
+_CLONE_WORDS = re.compile(r"\b(molecular clone|infectious clone|clone|proviral)\b", re.IGNORECASE)
+
+
+def is_clone_derived(fields: dict[str, Any]) -> bool:
+    """True if the record says it comes from a clone or a provirus.
+
+    A flag, not a verdict: lab infectious clones and within-host PCR clones both set it.
+    """
+    if fields.get("clone") or fields.get("proviral"):
+        return True
+    return bool(_CLONE_WORDS.search(fields.get("definition", "") or ""))
 
 
 def ambiguity_fraction(sequence: str) -> float:
@@ -91,10 +106,14 @@ def normalise_record(
         "date": parsed.date,
         "date_precision": parsed.precision,
         "year": parsed.year,
+        "isolate": record.fields.get("isolate", "") or None,
         "subtype_reported": record.fields.get("subtype", "") or None,
         "ambiguity_frac": round(ambiguity_fraction(record.sequence), 6),
-        # Never inferred from mutations: that would be circular.
-        "treatment_status": "unknown",
+        "clone_derived": is_clone_derived(record.fields),
+        # Only from an explicit statement in the record's own text; never from mutations.
+        "treatment_status": treatment_from_text(record.fields),
+        "study_key": study_key(record.fields),
+        "study_title": (record.fields.get("study_title", "") or "")[:200] or None,
         "qc_status": "pass",
         "qc_reason": None,
         "snapshot_id": snapshot_id,
@@ -172,8 +191,15 @@ def normalise_records(
     result = NormaliseResult(rows=rows, quarantine=quarantine, n_in=len(records))
     result.assert_conserved()
     if records and len(quarantine) / len(records) > max_record_error_rate:
-        raise ContractError(
-            f"{len(quarantine)}/{len(records)} records quarantined, above "
-            f"max_record_error_rate={max_record_error_rate}; refusing to continue"
+        by_rule = Counter(q["rule"] for q in quarantine)
+        examples = "; ".join(
+            f"{q['accession']} [{q['rule']}] {q['reason']}" for q in quarantine[:3]
         )
+        error = ContractError(
+            f"{len(quarantine)}/{len(records)} records quarantined, above "
+            f"max_record_error_rate={max_record_error_rate}; refusing to continue. "
+            f"By rule: {dict(by_rule)}. Examples: {examples}"
+        )
+        error.quarantine = quarantine  # type: ignore[attr-defined]
+        raise error
     return result

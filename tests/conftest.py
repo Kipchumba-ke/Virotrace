@@ -33,9 +33,7 @@ def config_path() -> Path:
 
 @pytest.fixture(scope="session")
 def sdrm_list():
-    return load_sdrm_list(
-        REPO_ROOT / "config" / "reference" / "sdrm_who.PLACEHOLDER.tsv", version="placeholder"
-    )
+    return load_sdrm_list(REPO_ROOT / "config" / "reference" / "sdrm_who.tsv", version="2009")
 
 
 @pytest.fixture

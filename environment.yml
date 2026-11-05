@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.11
+  - python=3.12
   # orchestration
   - snakemake-minimal>=8.0
   # bioinformatics -- not reliably pip-installable, which is why conda
