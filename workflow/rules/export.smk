@@ -1,7 +1,7 @@
 """L4 -- export. Assembles outputs for humans; computes nothing new."""
 
 
-def auspice_inputs():
+def auspice_inputs(wildcards):
     required = {
         "meta": rules.subsample.output.meta,
         "drm": rules.drm_call.output.table,

@@ -22,6 +22,65 @@ from ..io.manifest import (
 from .base import RawRecord, SourceAdapter
 
 
+def latest_snapshot(raw_root: Path | str) -> Path:
+    """Most recent snapshot directory under ``raw_root`` that has a manifest.
+
+    Snapshot ids start with an ISO date, so name order is chronological. Pin
+    ``snapshot_id`` in the config for a reproducible rerun instead of relying on this.
+    """
+    raw_root = Path(raw_root)
+    candidates = sorted(p for p in raw_root.glob("*") if (p / "manifest.json").exists())
+    if not candidates:
+        raise ContractError(f"no snapshots with a manifest under {raw_root}")
+    return candidates[-1]
+
+
+def write_pointer(raw_root: Path | str, scope: str, snapshot_dir: Path | str) -> Path:
+    """Record which snapshot a scope's build uses: ``<raw_root>/<scope>.current``.
+
+    The pointer is a tiny text file holding the snapshot id, so Snakemake has a
+    fixed output path even though snapshot directories are named dynamically.
+    """
+    pointer = Path(raw_root) / f"{scope}.current"
+    pointer.parent.mkdir(parents=True, exist_ok=True)
+    pointer.write_text(Path(snapshot_dir).name + "\n")
+    return pointer
+
+
+def resolve_snapshot(raw_root: Path | str, scope: str, pinned_id: str | None = None) -> Path:
+    """Pinned id wins (reproducible rerun), then the scope pointer, then the newest."""
+    raw_root = Path(raw_root)
+    if pinned_id:
+        pinned = raw_root / pinned_id
+        if not (pinned / "manifest.json").exists():
+            raise ContractError(f"pinned snapshot {pinned_id!r} not found under {raw_root}")
+        return pinned
+    pointer = raw_root / f"{scope}.current"
+    if pointer.exists():
+        target = raw_root / pointer.read_text().strip()
+        if not (target / "manifest.json").exists():
+            raise ContractError(f"{pointer} points at {target.name}, which has no manifest")
+        return target
+    return latest_snapshot(raw_root)
+
+
+def load_snapshot_records(snapshot_dir: Path | str) -> list[RawRecord]:
+    """Rebuild raw records from a snapshot's FASTA and records table."""
+    from ..io.fasta import read_fasta
+    from ..io.tables import read_tsv
+
+    snapshot_dir = Path(snapshot_dir)
+    sequences = dict(read_fasta(snapshot_dir / "sequences.fasta"))
+    records: list[RawRecord] = []
+    for row in read_tsv(snapshot_dir / "records.tsv"):
+        accession = row.pop("accession")
+        source = row.pop("source")
+        if accession not in sequences:
+            raise ContractError(f"{snapshot_dir.name}: {accession} in records.tsv has no sequence")
+        records.append(RawRecord(accession, sequences[accession], source, row))
+    return records
+
+
 def take_snapshot(
     adapters: Sequence[SourceAdapter],
     raw_root: Path | str,

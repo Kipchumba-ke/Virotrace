@@ -1,0 +1,8 @@
+# Stanford HIVdb "Surveillance Drug Resistance Mutations" page, last updated 2026-09-25.
+# The WHO 2009 list (NRTI/NNRTI/PI) PLUS additions from Rhee 2021 and Rhee 2023
+# (NRTI/NNRTI), plus an INSTI list (Tzou 2020, with additions from Tao 2023).
+# Transcribed from screenshots of the page; verify before reporting.
+NRTI: M41L, K65R/N, D67N/G/E, T69D/Ins/Del, K70R/E/Q/N/S/T/G/Del, L74V/I, V75M/T/A/S, F77L, Y115F, F116Y, Q151M, M184V/I, L210W, T215Y/F/I/S/C/D/V/E, K219Q/E/N/R
+NNRTI: L100I, K101E/P, K103N/S, V106M/A, V179F, Y181C/I/V, Y188L/H/C, G190A/S/E, H221Y, P225H, F227C/L, M230L, L234I, Y318F
+PI: L23I, L24I, D30N, V32I, M46I/L, I47V/A, G48V/M, I50V/L, F53L/Y, I54V/L/M/A/T/S, G73S/T/C/A, L76V, V82A/T/F/S/C/M/L, N83D, I84V/A/C, I85V, N88D/S, L90M
+INSTI: A49G, H51Y, T66A/I/K, E92G/Q, G118R, F121Y, E138A/K/T, G140A/C/S, Y143C/H/R/S, S147G, Q148H/R/K, G149A, S153Y/F, N155H, S230R, R263K

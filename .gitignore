@@ -11,6 +11,7 @@
 !/data/raw/
 !/data/raw/**/
 !/data/raw/**/manifest.json
+data/raw/
 
 # Stray sequence dumps at the repo root (fixtures under tests/ are unaffected).
 /*.fasta
@@ -69,6 +70,9 @@ node_modules/
 __pycache__/
 *.py[cod]
 *$py.class
+# A virtual environment created inside the repo as ./virotrace/ (anchored, so it does
+# not match the real package at src/virotrace/).
+/virotrace/
 .venv/
 venv/
 env/
@@ -119,3 +123,5 @@ desktop.ini
 # tests/fixtures/*            synthetic sequences, no real patient data
 # tests/regression/golden/*   regression baselines; a refresh must show in a diff
 # data/raw/**/manifest.json   the queries that rebuild a snapshot
+
+unmbox.py

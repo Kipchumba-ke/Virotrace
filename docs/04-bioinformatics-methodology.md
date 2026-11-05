@@ -79,6 +79,20 @@ Agreement is recorded in `subtype_agreement`. Disagreements are **reported, not 
 fiat** — in a recombinant-rich epidemic, disagreement between subtyping methods is itself
 informative, and hiding it would misrepresent confidence.
 
+**As implemented (Phase 2).** Placement is *distance-based*: each QC-passed sequence is compared with
+the reference panel over sites where both have an unambiguous base, the call is the nearest label,
+and its support is the share of site-bootstrap replicates that agree (`subtype.min_support`, default
+0.70; below it the call is `unassigned`). The second, independent call is not yet an external tool:
+the depositor's own label is compared (`subtype_agreement`: agree / disagree / unreported /
+not_comparable) and disagreement is reported, not resolved. Recombination is screened by a
+sliding-window subtype scan (`recombination.method: window_scan`): a sequence is `suspected` when
+two or more supported segments carry different labels and `confirmed` when each segment re-placed on
+its own columns keeps its label at `confirm_support`. Limits to carry into the report: pol (a PR+RT
+genotype is about 1.3 kb) is short, so intra-subtype and near-end breakpoints are invisible; a mosaic
+of lineages missing from the panel looks like an unassigned sequence, not a recombinant; and this is
+not 3SEQ or RDP and claims none of their statistics. The panel is supplied by the user
+(`config/reference/subtype_references.fasta`, LANL headers such as `A1.KE.00.name.ACCESSION`).
+
 **Recombination screening.** Kenya's epidemic is predominantly subtype A1 with D, C, and a
 substantial burden of circulating and unique recombinant forms. A single bifurcating tree assumes no
 recombination, so:

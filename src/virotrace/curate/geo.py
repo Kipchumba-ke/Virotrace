@@ -88,6 +88,99 @@ _NON_AFRICA: dict[str, str] = {
     "NLD": "Netherlands",
     "AUS": "Australia",
     "CAN": "Canada",
+    "AFG": "Afghanistan",
+    "ALB": "Albania",
+    "ARE": "United Arab Emirates",
+    "ARG": "Argentina",
+    "ARM": "Armenia",
+    "AUT": "Austria",
+    "AZE": "Azerbaijan",
+    "BGD": "Bangladesh",
+    "BGR": "Bulgaria",
+    "BHR": "Bahrain",
+    "BLR": "Belarus",
+    "BOL": "Bolivia",
+    "BRN": "Brunei",
+    "BTN": "Bhutan",
+    "CHE": "Switzerland",
+    "CHL": "Chile",
+    "COL": "Colombia",
+    "CRI": "Costa Rica",
+    "CUB": "Cuba",
+    "CYP": "Cyprus",
+    "CZE": "Czech Republic",
+    "DNK": "Denmark",
+    "DOM": "Dominican Republic",
+    "ECU": "Ecuador",
+    "EST": "Estonia",
+    "FIN": "Finland",
+    "GEO": "Georgia",
+    "GRC": "Greece",
+    "GTM": "Guatemala",
+    "HKG": "Hong Kong",
+    "HND": "Honduras",
+    "HRV": "Croatia",
+    "HTI": "Haiti",
+    "HUN": "Hungary",
+    "IDN": "Indonesia",
+    "IRL": "Ireland",
+    "IRN": "Iran",
+    "IRQ": "Iraq",
+    "ISL": "Iceland",
+    "ISR": "Israel",
+    "ITA": "Italy",
+    "JAM": "Jamaica",
+    "JOR": "Jordan",
+    "JPN": "Japan",
+    "KAZ": "Kazakhstan",
+    "KGZ": "Kyrgyzstan",
+    "KHM": "Cambodia",
+    "KOR": "South Korea",
+    "KWT": "Kuwait",
+    "LAO": "Laos",
+    "LBN": "Lebanon",
+    "LKA": "Sri Lanka",
+    "LTU": "Lithuania",
+    "LUX": "Luxembourg",
+    "LVA": "Latvia",
+    "MDA": "Moldova",
+    "MEX": "Mexico",
+    "MMR": "Myanmar",
+    "MNG": "Mongolia",
+    "MYS": "Malaysia",
+    "NIC": "Nicaragua",
+    "NOR": "Norway",
+    "NPL": "Nepal",
+    "NZL": "New Zealand",
+    "OMN": "Oman",
+    "PAK": "Pakistan",
+    "PAN": "Panama",
+    "PER": "Peru",
+    "PHL": "Philippines",
+    "POL": "Poland",
+    "PRI": "Puerto Rico",
+    "PRT": "Portugal",
+    "PRY": "Paraguay",
+    "QAT": "Qatar",
+    "ROU": "Romania",
+    "RUS": "Russia",
+    "SAU": "Saudi Arabia",
+    "SGP": "Singapore",
+    "SRB": "Serbia",
+    "SVK": "Slovakia",
+    "SVN": "Slovenia",
+    "SWE": "Sweden",
+    "SYR": "Syria",
+    "TJK": "Tajikistan",
+    "TKM": "Turkmenistan",
+    "TUR": "Turkey",
+    "TWN": "Taiwan",
+    "UKR": "Ukraine",
+    "URY": "Uruguay",
+    "UZB": "Uzbekistan",
+    "VEN": "Venezuela",
+    "VNM": "Vietnam",
+    "YEM": "Yemen",
 }
 
 _ALIASES: dict[str, str] = {
@@ -108,6 +201,11 @@ _ALIASES: dict[str, str] = {
     "uk": "GBR",
     "great britain": "GBR",
     "south sudan": "SSD",
+    "russian federation": "RUS",
+    "viet nam": "VNM",
+    "south korea": "KOR",
+    "republic of korea": "KOR",
+    "czechia": "CZE",
 }
 
 
@@ -131,6 +229,20 @@ class GeoResult:
     region: str
     admin1_raw: str  # whatever followed the colon, unresolved
     admin1_resolved: bool
+
+
+def countries_for_scope(codes: list[str], regions: list[str]) -> list[str]:
+    """Canonical country names for a scope, used to build source queries.
+
+    Explicit ``codes`` and every country in ``regions`` are unioned, in a stable order.
+    """
+    selected = {c for c in codes if c in _AFRICA}
+    selected |= {code for code, (_, region) in _AFRICA.items() if region in regions}
+    return sorted(_AFRICA[c][0] for c in selected)
+
+
+def in_scope(geo: GeoResult, codes: list[str], regions: list[str]) -> bool:
+    return geo.country_code in codes or geo.region in regions
 
 
 def normalise_country(raw: str | None) -> GeoResult | None:

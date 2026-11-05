@@ -1,0 +1,8 @@
+# WHO 2009 List of Surveillance Drug Resistance Mutations (Bennett et al. 2009).
+# Transcribed from the Stanford HIVdb "Surveillance Drug Resistance Mutations" page
+# (last updated 2026-09-25): the entries shown in BLACK for NRTI, NNRTI and PI.
+# Verify against the paper's table before relying on it; the importer's HXB2 check
+# catches most typos but not a missing entry.
+NRTI: M41L, K65R, D67N/G/E, T69D/Ins, K70R/E, L74V/I, V75M/T/A/S, F77L, Y115F, F116Y, Q151M, M184V/I, L210W, T215Y/F/I/S/C/D/V/E, K219Q/E/N/R
+NNRTI: L100I, K101E/P, K103N/S, V106M/A, V179F, Y181C/I/V, Y188L/H/C, G190A/S/E, P225H, M230L
+PI: L23I, L24I, D30N, V32I, M46I/L, I47V/A, G48V/M, I50V/L, F53L/Y, I54V/L/M/A/T/S, G73S/T/C/A, L76V, V82A/T/F/S/C/M/L, N83D, I84V/A/C, I85V, N88D/S, L90M

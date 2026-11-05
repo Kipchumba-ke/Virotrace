@@ -65,3 +65,27 @@ def test_unmapped_country_is_none_not_a_guess():
     assert normalise_country("Atlantis") is None
     assert normalise_country("") is None
     assert normalise_country(None) is None
+
+
+@pytest.mark.parametrize("raw", ["Finland", "Viet Nam: Hanoi", "Japan", "Russian Federation"])
+def test_real_countries_outside_africa_are_recognised_not_unmapped(raw):
+    # An out-of-scope country is a valid record to count, never a data error.
+    result = normalise_country(raw)
+    assert result is not None
+    assert result.region == "non_africa"
+
+
+def test_corpus_reports_strict_dated_tips_by_year():
+    from virotrace.curate.corpus import count_corpus
+
+    rows = [
+        {"country_code": "KEN", "date_precision": p, "year": y, "region": "eastern_africa"}
+        for p, y in [
+            ("day", 2010),
+            ("month", 2010),
+            ("month", 2012),
+            ("year", 2012),
+            ("unknown", None),
+        ]
+    ]
+    assert count_corpus(rows)["strict_dated_by_year"] == {"2010": 2, "2012": 1}

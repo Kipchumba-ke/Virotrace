@@ -4,11 +4,30 @@ Rules wire stages together; they contain no analytical logic. Each rule shells o
 to one `virotrace` subcommand, so every stage stays independently runnable and
 testable. See docs/02-system-architecture.md for the DAG.
 
-    snakemake --profile dev --dry-run
-    snakemake --cores 4 --config scope=kenya
+    snakemake --cores 2 --config scope=kenya profile=dev      # toy build
+    snakemake --cores 4 --config scope=kenya profile=kenya
+    snakemake --dry-run --cores 1 --config scope=africa profile=africa
 """
 
 configfile: "config/config.yaml"
+
+import os
+
+from virotrace.settings import load_settings
+
+# Resolve configuration through the same loader the CLI uses (base < profile < scope),
+# so Snakemake and every stage it launches see one configuration, and a bad config
+# fails here at load time rather than forty minutes into a tree.
+_PROFILE = config.get("profile")
+_SETTINGS = load_settings(
+    "config/config.yaml",
+    _PROFILE,
+    {"scope": config["scope"]} if "profile" not in config else None,
+)
+config.update(_SETTINGS.model_dump(mode="json", by_alias=True))
+os.environ["VIROTRACE_SCOPE"] = config["scope"]
+if _PROFILE:
+    os.environ["VIROTRACE_PROFILE"] = _PROFILE
 
 
 SCOPE = config["scope"]

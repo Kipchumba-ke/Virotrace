@@ -25,7 +25,7 @@ other.
 ## Quickstart
 
 ```bash
-git clone https://github.com/Kipchumba-ke/Virotrace && cd virotrace
+git clone <this-repo> && cd virotrace
 make setup && conda activate virotrace
 
 virotrace info                     # resolved versions of every external binary
@@ -79,10 +79,13 @@ estimation, subsampling, hypermutation screen and temporal gate are implemented 
 tested; acquisition, alignment, subtyping, recombination, tree inference and export are
 scaffolded CLI stages that exit with a pointer to the phase they land in.
 
-Before any result is reported, two files must be replaced:
-`config/reference/sdrm_who.PLACEHOLDER.tsv` with the authoritative WHO surveillance
-mutation list, and `config/reference/hxb2.gb` with the pinned HXB2 record (which switches
-on the skipped coordinate test).
+Reference data lives in `config/reference/`: the pinned HXB2 record (`hxb2.gb`) and the
+WHO surveillance mutation lists. `sdrm_who.tsv` is the original WHO 2009 list (the
+headline metric, comparable with published estimates); `sdrm_stanford_2026-09-25.tsv` is
+the current Stanford list (2009 plus later additions and INSTI), used as a sensitivity
+analysis. Both are generated from the transcriptions in `config/reference/sources/` with
+`make sdrm`, which also checks every wild-type residue against HXB2. Verify a
+transcription against its source before reporting a result.
 
 ## Licence
 
