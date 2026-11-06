@@ -101,7 +101,13 @@ qc:
   clone_policy: exclude          # exclude | keep_all: clone-derived records leave the
   individual_policy: one_per_individual   # keep_all | one_per_individual: one sequence per
                                           # identifiable person (earliest, least ambiguous)
-  individual_id_patterns: ['^(RV217_\d+)_']  # regexes on the isolate name; group 1 = person id
+  individual_id_patterns:   # regexes on the isolate name; group 1 = person id; first match wins
+    - '^RV217_(\d+)_'            # Rossenkhan: RV217_20225_v01_GP_1_90 -> 20225
+    - '^(\d{5})v\d+_\d+$'        # Rolland, Lewitus, etc.: 20225v09_09 -> 20225 (same RV217 id space)
+    - '^(V\d+_\d+)_\d+_GP_'      # Mullins: V703_0865_070_GP_1_64 -> V703_0865 (assumed participant)
+    - '^(\d{2}KE\d+)pol\.M\d+$'   # PMID:27403940: 00KE170pol.M3 -> 00KE170 (months = visits)
+    - '^(\d{5})_\d{1,2}-[A-Z]{3}-\d{4}$'   # PMID:29293156: 64000_9-FEB-2012 -> 64000 (date = visit)
+    - '^(ACTG\d+_\d+)_\d+_PR_RT$'   # PMID:31724034: ACTG5288_40_1_PR_RT -> ACTG5288_40 (_1/_2 = repeat sequences)
                                  # prevalence and tree layers, stay in the DRM table
   lab_strain_list: lab_strains.txt
   max_record_error_rate: 0.25    # abort if more than this fraction quarantines
@@ -132,6 +138,7 @@ subsample:
   max_per_stratum: 40
   min_per_stratum: 1
   priority: [date_precision, gene_coverage, ambiguity_frac]
+  date_requirement: strict       # strict (day/month) | year (+ year-only, sensitivity) | none
 
 drm:
   algorithm: hivdb
@@ -190,6 +197,7 @@ phylo:
     distance: tn93
     threshold: 0.015
     min_size: 2
+    min_overlap: 300           # shared unambiguous sites needed to compare a pair
 
 report:
   min_stratum_n: 10

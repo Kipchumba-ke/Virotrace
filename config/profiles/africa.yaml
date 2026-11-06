@@ -9,7 +9,8 @@ subsample:
 phylo:
   tree:
     fast_mode: true
-    replicates: 200
+    replicates: 1000
+    bootstrap: none          # ufboot needs >= 1000 replicates; too slow on a laptop at this scale
 
 prevalence:
   min_stratum_n: 15

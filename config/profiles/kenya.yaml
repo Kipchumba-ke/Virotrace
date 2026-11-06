@@ -7,5 +7,7 @@ subsample:
   enabled: false
 
 phylo:
+  refine:
+    subtype_trees: [A1, D]   # C (44 tips) passes the gate but is too small to date; add it if wanted
   temporal_gate:
     date_randomisation: true

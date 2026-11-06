@@ -81,6 +81,24 @@ def test_unidentifiable_records_are_never_collapsed():
     assert len(kept) == 3 and not dropped
 
 
+def test_same_isolate_in_one_study_is_one_person_but_not_across_studies():
+    rows = [
+        {**_r("a", "QA203"), "study_key": "S1"},
+        {**_r("b", "QA203"), "study_key": "S1"},
+        {**_r("c", "QA203"), "study_key": "S2"},
+    ]
+    kept, dropped = one_per_individual(rows, RV)
+    assert {r["strain"] for r in kept} == {"a", "c"} and len(dropped) == 1
+
+
+def test_shared_participant_id_space_collapses_across_studies():
+    pats = [r"^RV217_(\d+)_", r"^(\d{5})v\d+_\d+$", r"^(V\d+_\d+)_\d+_GP_"]
+    assert individual_id("RV217_20225_v01_GP_1_90", pats) == "20225"
+    assert individual_id("20225v09_09", pats) == "20225"
+    assert individual_id("V703_0865_070_GP_1_64", pats) == "V703_0865"
+    assert individual_id("20225v09", pats) is None
+
+
 def test_policies_apply_clone_then_individual_and_report_counts():
     rows = [
         _r("a", "RV217_1_v01", date="2010-05"),
@@ -99,3 +117,36 @@ def test_policies_apply_clone_then_individual_and_report_counts():
     assert len(kept_all) == 4 and removed_all == {"clone_policy": 0, "individual_policy": 0}
     with pytest.raises(ConfigError):
         apply_population_policies(rows, clone_policy="exclude", individual_policy="x", patterns=RV)
+
+
+def test_per_person_counts_counts_people_not_sequences():
+    from virotrace.curate.clones import per_person_counts, person_map
+
+    rows = [
+        {"strain": "s1", "isolate": "RV217_1_a"},
+        {"strain": "s2", "isolate": "RV217_1_b"},
+        {"strain": "s3", "isolate": "RV217_1_c"},
+        {"strain": "s4", "isolate": "RV217_2_a"},
+        {"strain": "s5", "isolate": "other"},
+    ]
+    person_of = person_map(rows, [r"^(RV217_\d+)_"])
+    assert person_of["s5"] == "s5"
+    counts, mixed = per_person_counts(
+        {"s1": "C", "s2": "C", "s3": "A1", "s4": "A1", "s5": "D"}, person_of
+    )
+    assert counts == {"A1": 1, "C": 1, "D": 1}
+    assert mixed == 1  # RV217_1 has C, C, A1: modal call C, but flagged mixed
+
+
+def test_dated_visit_isolates_resolve_to_one_person():
+    pats = [r"^(\d{5})_\d{1,2}-[A-Z]{3}-\d{4}$"]
+    assert individual_id("64000_9-FEB-2012", pats) == "64000"
+    assert individual_id("64000_15-FEB-2010", pats) == "64000"
+    assert individual_id("25001541", pats) is None  # plain numeric ids are not matched
+
+
+def test_repeat_sequences_of_one_trial_participant_resolve_to_one_person():
+    pats = [r"^(ACTG\d+_\d+)_\d+_PR_RT$"]
+    assert individual_id("ACTG5288_40_1_PR_RT", pats) == "ACTG5288_40"
+    assert individual_id("ACTG5288_40_2_PR_RT", pats) == "ACTG5288_40"
+    assert individual_id("ACTG5288_41_1_PR_RT", pats) == "ACTG5288_41"

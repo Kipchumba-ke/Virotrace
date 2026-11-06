@@ -31,6 +31,7 @@ from ..errors import ContractError
 from ..io.fasta import read_fasta
 from ..io.tables import read_tsv, write_tsv
 from ..settings import Settings
+from .clones import per_person_counts, person_map
 from .subtype import Panel, build_panel, encode, panel_label, parent_group, place, pure_rows
 
 FLAG_COLUMNS = [
@@ -162,6 +163,9 @@ def run_recombination(settings: Settings, *, repo_root: Path | str = ".") -> dic
         ]
     )
     called = {r["strain"] for r in read_tsv(interim / "subtype_calls.tsv")}
+    person_of = person_map(
+        read_tsv(interim / "metadata.valid.tsv"), settings.qc.individual_id_patterns
+    )
     rng = np.random.default_rng(settings.stage_seed("recombination"))
 
     rows: list[dict[str, Any]] = []
@@ -194,6 +198,24 @@ def run_recombination(settings: Settings, *, repo_root: Path | str = ".") -> dic
                 for r in rows
                 if r["recomb_status"] in ("confirmed", "suspected")
             ).most_common(20)
+        ),
+        # people, not sequences
+        "status_by_individual": per_person_counts(
+            {r["strain"]: r["recomb_status"] for r in rows}, person_of
+        )[0],
+        "n_individuals_with_mixed_status": per_person_counts(
+            {r["strain"]: r["recomb_status"] for r in rows}, person_of
+        )[1],
+        "segment_patterns_by_individual": per_person_counts(
+            {
+                r["strain"]: ">".join(seg.split(":")[0] for seg in r["segments"].split(";"))
+                for r in rows
+                if r["recomb_status"] in ("confirmed", "suspected")
+            },
+            person_of,
+        )[0],
+        "n_individuals_excluded_from_tree": len(
+            {person_of.get(r["strain"], r["strain"]) for r in rows if r["exclude_from_tree"]}
         ),
         "tree_policy": cfg.tree_policy,
         "drm_policy": cfg.drm_policy,

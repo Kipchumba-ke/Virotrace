@@ -119,6 +119,9 @@ class SubsampleConfig(_Base):
     max_per_stratum: int = Field(40, ge=1)
     min_per_stratum: int = Field(1, ge=0)
     priority: list[str] = ["date_precision", "gene_coverage", "ambiguity_frac"]
+    # Which dates may reach the time tree: strict = day or month precision (the primary
+    # analysis), year = also year-only (the sensitivity run), none = undated tips allowed.
+    date_requirement: Literal["strict", "year", "none"] = "strict"
 
     @model_validator(mode="after")
     def _min_not_above_max(self) -> SubsampleConfig:
@@ -172,6 +175,9 @@ class TemporalGateConfig(_Base):
     min_temporal_r2: float = Field(0.10, ge=0, le=1)
     require_positive_slope: bool = True
     date_randomisation: bool = False
+    # shuffles for the date-randomisation test; 99 gives a smallest p of 0.01
+    n_permutations: int = Field(99, ge=19, le=9999)
+    max_permutation_p: float = Field(0.05, gt=0, le=1)
 
 
 class Admin1Config(_Base):
@@ -184,8 +190,51 @@ class TraitsConfig(_Base):
     admin1: Admin1Config = Admin1Config()
 
 
+class TreeConfig(_Base):
+    tool: str = "iqtree2"
+    model: str = "GTR+F+R4"
+    model_finder: bool = False  # True runs ModelFinder (-m MFP) and ignores ``model``
+    bootstrap: Literal["ufboot", "none"] = "ufboot"
+    replicates: int = Field(1000, ge=1)
+    fast_mode: bool = False
+
+    @model_validator(mode="after")
+    def _ufboot_needs_1000(self) -> TreeConfig:
+        if self.bootstrap == "ufboot" and self.replicates < 1000:
+            raise ConfigError(
+                f"phylo.tree.replicates is {self.replicates}, but IQ-TREE's ultrafast "
+                "bootstrap needs at least 1000; raise it or set bootstrap: none"
+            )
+        return self
+
+
+class RefineConfig(_Base):
+    enabled: bool = True
+    clock_rate: float | None = None  # fixed substitutions/site/year; None = estimate
+    clock_rate_prior: list[float] = [0.0008, 0.0030]
+    clock_filter_iqd: int = Field(4, ge=1)
+    date_confidence: bool = True
+    # Subtypes that get their own tree, gate and (if it passes) time tree. A pooled
+    # multi-subtype tree rarely has a usable clock; a subtype's own tree often does.
+    subtype_trees: list[str] = []
+
+
+class ClustersConfig(_Base):
+    enabled: bool = True
+    distance: Literal["tn93"] = "tn93"
+    threshold: float = Field(0.015, gt=0, lt=1)
+    min_size: int = Field(2, ge=2)
+    min_overlap: int = Field(300, ge=50)  # shared unambiguous sites needed to compare a pair
+    # Also cluster with SDRM codons masked, to see how much of "clustering" is convergent
+    # resistance pulling sequences together. Reported beside the primary result, never instead.
+    sensitivity_mask_sdrm: bool = True
+
+
 class PhyloConfig(_Base):
     enabled: bool = True
+    clusters: ClustersConfig = ClustersConfig()
+    tree: TreeConfig = TreeConfig()
+    refine: RefineConfig = RefineConfig()
     temporal_gate: TemporalGateConfig = TemporalGateConfig()
     traits: TraitsConfig = TraitsConfig()
 

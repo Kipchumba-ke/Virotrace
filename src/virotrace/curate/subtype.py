@@ -38,6 +38,7 @@ from ..errors import ContractError
 from ..io.fasta import read_fasta, write_fasta
 from ..io.tables import read_tsv, write_tsv
 from ..settings import Settings
+from .clones import per_person_counts, person_map
 
 UNASSIGNED = "unassigned"
 CALL_COLUMNS = [
@@ -357,9 +358,9 @@ def run_subtype(
     crf_panel = build_panel(panel_rows)  # tier 2: with CRFs, only to annotate `crf_label`
 
     passed = {r["strain"] for r in read_tsv(passed_path)}
-    reported = {
-        r["strain"]: r.get("subtype_reported", "") for r in read_tsv(interim / "metadata.valid.tsv")
-    }
+    meta = read_tsv(interim / "metadata.valid.tsv")
+    reported = {r["strain"]: r.get("subtype_reported", "") for r in meta}
+    person_of = person_map(meta, settings.qc.individual_id_patterns)
     rng = np.random.default_rng(settings.stage_seed("subtype"))
 
     rows: list[dict[str, Any]] = []
@@ -446,6 +447,13 @@ def run_subtype(
         ),
         "min_support": cfg.min_support,
         "n_bootstrap": cfg.n_bootstrap,
+        # people, not sequences: a person takes their most common call
+        "called_by_individual": per_person_counts(
+            {r["strain"]: r["subtype_called"] for r in rows}, person_of
+        )[0],
+        "n_individuals_with_mixed_calls": per_person_counts(
+            {r["strain"]: r["subtype_called"] for r in rows}, person_of
+        )[1],
         "called": dict(Counter(r["subtype_called"] for r in rows).most_common()),
         "agreement": dict(Counter(r["subtype_agreement"] for r in rows)),
         # which pairs drive the disagreements: "called|reported" -> count

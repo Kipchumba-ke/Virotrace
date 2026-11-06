@@ -35,6 +35,9 @@ app.add_typer(validate_app, name="validate")
 
 ConfigOpt = Annotated[Path, typer.Option("--config", help="Base config YAML.")]
 ProfileOpt = Annotated[str | None, typer.Option("--profile", help="dev | kenya | africa")]
+SubtypeOpt = Annotated[
+    str | None, typer.Option("--subtype", help="Build for one called subtype (e.g. A1) only.")
+]
 
 
 def _not_implemented(stage: str) -> None:
@@ -150,8 +153,15 @@ def align(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = 
 @app.command()
 def mask(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
     """L2: gap-mask the QC-passed alignment for tree inference (never for DRM calling)."""
-    load_settings(config, profile)
-    _not_implemented("mask")
+    from .curate.mask import run_mask
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_mask(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @app.command()
@@ -187,8 +197,15 @@ def recombination(
 @app.command()
 def subsample(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
     """L2: deterministic stratified subsampling."""
-    load_settings(config, profile)
-    _not_implemented("subsample")
+    from .curate.subsample_stage import run_subsample
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_subsample(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @drm_app.command("call")
@@ -222,19 +239,55 @@ def drm_prevalence(
 
 
 @phylo_app.command("tree")
-def phylo_tree(config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None) -> None:
+def phylo_tree(
+    config: ConfigOpt = Path("config/config.yaml"),
+    profile: ProfileOpt = None,
+    subtype: SubtypeOpt = None,
+) -> None:
     """L3b: maximum-likelihood tree."""
-    load_settings(config, profile)
-    _not_implemented("phylo tree")
+    from .phylo.stage import run_tree
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_tree(settings, subtype=subtype)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @phylo_app.command("refine")
 def phylo_refine(
-    config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
+    config: ConfigOpt = Path("config/config.yaml"),
+    profile: ProfileOpt = None,
+    subtype: SubtypeOpt = None,
 ) -> None:
     """L3b: time-resolved refinement behind the temporal-signal gate."""
-    load_settings(config, profile)
-    _not_implemented("phylo refine")
+    from .phylo.stage import run_refine
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_refine(settings, subtype=subtype)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+
+
+@phylo_app.command("subtrees")
+def phylo_subtrees(
+    config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
+) -> None:
+    """L3b: a tree (and, if its own gate passes, a time tree) for each configured subtype."""
+    from .phylo.stage import run_subtype_trees
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_subtype_trees(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @phylo_app.command("traits")
@@ -251,8 +304,15 @@ def phylo_clusters(
     config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
 ) -> None:
     """L3b: TN93 clustering as a descriptive population statistic."""
-    load_settings(config, profile)
-    _not_implemented("phylo clusters")
+    from .phylo.clusters import run_clusters
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_clusters(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @export_app.command("auspice")
@@ -260,8 +320,15 @@ def export_auspice(
     config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
 ) -> None:
     """L4: Auspice v2 JSON with DRM colourings."""
-    load_settings(config, profile)
-    _not_implemented("export auspice")
+    from .export.auspice import run_export
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_export(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @export_app.command("report")

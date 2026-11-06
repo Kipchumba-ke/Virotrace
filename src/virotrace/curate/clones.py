@@ -51,6 +51,50 @@ def individual_id(isolate: str | None, patterns: Sequence[str]) -> str | None:
     return None
 
 
+def person_key(row: Mapping[str, Any], patterns: Sequence[str]) -> str:
+    """The person a record belongs to.
+
+    A matching pattern gives the person id. Otherwise records with the same isolate name in
+    the same study are the same sample (repeated clones of one isolate); with no isolate name
+    the record is its own person.
+    """
+    person = individual_id(row.get("isolate"), patterns)
+    if person is not None:
+        return person
+    isolate = str(row.get("isolate") or "").strip()
+    if isolate:
+        return f"{row.get('study_key') or ''}|{isolate}"
+    return str(row["strain"])
+
+
+def person_map(rows: Iterable[Mapping[str, Any]], patterns: Sequence[str]) -> dict[str, str]:
+    """``strain -> person``; a record matching no pattern is its own person (its strain id)."""
+    return {r["strain"]: individual_id(r.get("isolate"), patterns) or r["strain"] for r in rows}
+
+
+def per_person_counts(
+    values: Mapping[str, str], person_of: Mapping[str, str]
+) -> tuple[dict[str, int], int]:
+    """Count people, not sequences, by a per-strain value.
+
+    A person takes their most common value (ties broken alphabetically). Returns
+    ``({value: n_people}, n_people_whose_sequences_disagree)``.
+    """
+    per: dict[str, list[str]] = {}
+    for strain, value in values.items():
+        per.setdefault(person_of.get(strain, strain), []).append(value)
+    counts: dict[str, int] = {}
+    mixed = 0
+    for vals in per.values():
+        tally: dict[str, int] = {}
+        for v in vals:
+            tally[v] = tally.get(v, 0) + 1
+        mixed += len(tally) > 1
+        top = sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+        counts[top] = counts.get(top, 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: -kv[1])), mixed
+
+
 def one_per_individual(
     rows: Iterable[Mapping[str, Any]], patterns: Sequence[str]
 ) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]:
@@ -58,15 +102,14 @@ def one_per_individual(
 
     Within a person the earliest dated sequence wins, then the least ambiguous, then the
     smallest strain id, so the choice is deterministic and does not depend on input order.
-    A record whose isolate matches no pattern is its own person and is always kept. Every
+    A record matching no pattern is grouped with other records of the same isolate name in
+    the same study (see ``person_key``); with no isolate name it is its own person. Every
     input row lands in exactly one list.
     """
     rows = list(rows)
     groups: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
-        person = individual_id(row.get("isolate"), patterns)
-        if person is not None:
-            groups.setdefault(person, []).append(row)
+        groups.setdefault(person_key(row, patterns), []).append(row)
 
     def rank(row: Mapping[str, Any]) -> tuple[str, float, str]:
         return (
@@ -79,8 +122,7 @@ def one_per_individual(
     kept: list[Mapping[str, Any]] = []
     excluded: list[Mapping[str, Any]] = []
     for row in rows:
-        identified = individual_id(row.get("isolate"), patterns) is not None
-        (kept if not identified or id(row) in winners else excluded).append(row)
+        (kept if id(row) in winners else excluded).append(row)
     return kept, excluded
 
 
