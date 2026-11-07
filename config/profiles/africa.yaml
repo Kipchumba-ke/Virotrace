@@ -6,7 +6,15 @@ subsample:
   enabled: true
   max_per_stratum: 25
 
+acquire:
+  # Add `lanl` once the LANL downloads are in acquire.lanl_path (docs/03-data-acquisition.md).
+  sources: [genbank]
+
 phylo:
+  refine:
+    subtype_trees: [A1, C, D, G]   # each gets its own temporal gate; pooled Africa trees will not pass
+  temporal_gate:
+    date_randomisation: true
   tree:
     fast_mode: true
     replicates: 1000
@@ -14,6 +22,7 @@ phylo:
 
 prevalence:
   min_stratum_n: 15
+  by_country: true
 
 report:
   min_stratum_n: 15

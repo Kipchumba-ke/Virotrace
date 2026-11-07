@@ -251,6 +251,8 @@ def run_prevalence(settings: Settings, *, repo_root: Path | str = ".") -> dict[s
         if row["year"].strip():
             found.append(("year_bin", year_bin(int(row["year"]), width)))
         found.append(("treatment_status", row.get("treatment_status", "").strip() or "unannotated"))
+        if cfg.by_country:
+            found.append(("country", row.get("country", "").strip() or "unknown"))
         if cfg.also_by_subtype and called is not None:
             found.append(("subtype_called", row.get("subtype_called", "") or "unassigned"))
         elif cfg.also_by_subtype:

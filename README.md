@@ -16,7 +16,7 @@ resistance report as outputs.
 | Layer | Question | Output |
 |---|---|---|
 | **DRM** | Which resistance mutations are present in deposited Kenyan HIV-1 *pol* sequences, at what prevalence, in which drug classes, and how does that compare with the wider region? | `results/<scope>/drm/prevalence.tsv`, resistance report |
-| **Phylo** | What subtypes and recombinant forms are represented, how are they structured, and what does a time-resolved tree with geographic traits show? | `auspice/virotrace_<scope>_pol.json` |
+| **Phylo** | What subtypes and recombinant forms are represented, how are they structured, and what does a time-resolved tree with geographic traits show? | `auspice/virotrace_<scope>.json`, plus `virotrace_<scope>_<subtype>.json` dated trees |
 
 The two layers meet at a file contract (`drm_table.tsv`), not a code dependency, so
 resistance mutations appear as colourings on the tree without either layer importing the
@@ -25,7 +25,7 @@ other.
 ## Quickstart
 
 ```bash
-git clone <this-repo> && cd virotrace
+git clone https://github.com/Kipchumba-ke/Virotrace && cd virotrace
 make setup && conda activate virotrace
 
 virotrace info                     # resolved versions of every external binary
@@ -74,10 +74,48 @@ and the report cannot be generated without it.
 
 ## Project status
 
-Phase 0 — scaffold. The configuration layer, QC rules, mutation model, prevalence
-estimation, subsampling, hypermutation screen and temporal gate are implemented and
-tested; acquisition, alignment, subtyping, recombination, tree inference and export are
-scaffolded CLI stages that exit with a pointer to the phase they land in.
+The Kenya build runs end to end on real data. Each stage is a `virotrace` command, and the
+Snakemake rules in `workflow/` run the same stages in the same order:
+
+```bash
+virotrace acquire   --profile kenya      # L0 snapshot with manifest
+virotrace normalise --profile kenya      # L1 dedup, scope filter, validation
+virotrace align     --profile kenya      # L2 MAFFT to HXB2 pol coordinates
+virotrace qc        --profile kenya      # L2 QC ledger; clone and individual policies
+virotrace drm call  --profile kenya      # L3a mutations at SDRM positions
+virotrace subtype   --profile kenya      # L2 subtype placement (depositor label compared)
+virotrace recombination --profile kenya  # L2 breakpoint screen
+virotrace drm prevalence --profile kenya # L3a per-class prevalence, Wilson CIs, trends
+virotrace mask      --profile kenya      # L2 gap-masked alignment for the tree only
+virotrace subsample --profile kenya      # L2 tree set: strictly dated, one per individual
+virotrace phylo tree     --profile kenya # L3b IQ-TREE
+virotrace phylo refine   --profile kenya # L3b temporal gate, then time tree or divergence tree
+virotrace phylo subtrees --profile kenya # L3b per-subtype trees and gates (A1, D)
+virotrace phylo clusters --profile kenya # L3b TN93 clusters (descriptive only)
+virotrace export auspice --profile kenya # L4 Auspice datasets in auspice/
+virotrace export report  --profile kenya # L4 HTML report in reports/<scope>/index.html
+auspice view --datasetDir auspice
+```
+
+Implemented: acquisition (GenBank), normalisation, QC, alignment, DRM calling and prevalence,
+person identification across studies, subtype placement, a recombination screen, masking,
+subsampling, tree inference, the temporal-signal gate with date randomisation, per-subtype
+dated trees, clusters, the Auspice export, and the HTML report with its limitations section.
+Not yet: ancestral trait reconstruction (`phylo traits`, off in the DAG until it exists), the
+LANL adapter, the Africa-scope build, and amino-acid mutation tracks in the export.
+
+What the current results say, and do not say:
+
+- **Clusters** are a descriptive statistic at a 1.5% TN93 threshold, not transmission chains.
+  SDRM prevalence is higher inside clusters than outside, but the difference disappears after
+  stratifying by study treatment context; it reflects which cohorts are densely sampled.
+- **Pooled trees do not have usable temporal signal**; per-subtype trees (A1, D) do, with low
+  estimated rates, so dated trees give rough timelines only.
+- **Subtyping and recombination are screens**, not RDP or 3SEQ. The point-mutation caller does
+  not detect the T69 insertions or the K70 deletion.
+- **Individual identification** relies on isolate-name patterns in
+  `qc.individual_id_patterns`. Studies whose naming is not covered are treated as one person
+  per record, so duplicate people can remain. Review `near_identical_pairs.tsv` after a run.
 
 Reference data lives in `config/reference/`: the pinned HXB2 record (`hxb2.gb`) and the
 WHO surveillance mutation lists. `sdrm_who.tsv` is the original WHO 2009 list (the

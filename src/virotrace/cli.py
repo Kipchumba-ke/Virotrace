@@ -336,8 +336,15 @@ def export_report(
     config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
 ) -> None:
     """L4: the surveillance report, limitations section included by construction."""
-    load_settings(config, profile)
-    _not_implemented("export report")
+    from .export.report import run_report
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_report(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 def main() -> None:

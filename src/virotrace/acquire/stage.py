@@ -11,6 +11,7 @@ from ..settings import Settings
 from .base import SourceAdapter
 from .fixture import FixtureAdapter
 from .genbank import GenBankAdapter, build_term
+from .lanl import LanlAdapter
 from .snapshot import take_snapshot, write_pointer
 
 
@@ -49,8 +50,8 @@ def build_adapters(
                 )
             )
         elif name == "lanl":
-            raise ConfigError(
-                "the LANL adapter is not implemented yet; remove 'lanl' from acquire.sources"
+            adapters.append(
+                LanlAdapter(Path(repo_root) / acquire.get("lanl_path", "data/external/lanl"))
             )
         else:
             raise ConfigError(f"unknown acquire source {name!r}")

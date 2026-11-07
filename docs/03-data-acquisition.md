@@ -43,6 +43,15 @@ guard `data/` from being committed at all.
 | **GADM / national admin boundaries** | Kenya county geometries for mapping | n/a | Reference data, pinned version, only applied where a record actually supplies subnational location |
 | **WHO HIV drug resistance reports** | Published regional DRM prevalence | n/a | Not ingested. Used in the report's discussion as an external sanity check on magnitude |
 
+**Running the LANL source.** LANL has no query API, so the adapter reads files you download:
+at hiv.lanl.gov run the Sequence Search (HIV-1, pol region, the countries of your scope), download
+the result as FASTA with the default header `Subtype.Country.Year.Name.Accession`, put the files in
+`data/external/lanl/` (git-ignored: LANL's terms do not permit redistribution), and add `lanl` to
+`acquire.sources`. The snapshot manifest records each file's name and SHA256 in place of a query
+string. LANL headers carry no title or PubMed id, so a record found only in LANL has no study key
+and counts as its own individual; where GenBank holds the same record, deduplication keeps the
+GenBank copy. Re-downloading later returns a superset, so keep the files you built from.
+
 Deduplication across LANL and GenBank is mandatory and non-trivial: match on accession first, then on
 sequence identity, then on `(strain, country, year)` near-duplicates. The dedup decision for every
 collapsed pair is logged.

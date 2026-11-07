@@ -54,9 +54,15 @@ def _ambiguity(sequence: str) -> int:
     return sum(1 for b in sequence if b not in "ACGT")
 
 
-def _rank(record: RawRecord) -> tuple[int, int, str]:
-    """Lower is better: fewer ambiguous bases, then longer, then accession for stability."""
-    return (_ambiguity(record.sequence), -len(record.sequence), record.accession)
+def _rank(record: RawRecord) -> tuple[int, int, int, str]:
+    """Lower is better: GenBank first (it carries the study fields LANL lacks), then fewer
+    ambiguous bases, then longer, then accession for stability."""
+    return (
+        0 if record.source == "genbank" else 1,
+        _ambiguity(record.sequence),
+        -len(record.sequence),
+        record.accession,
+    )
 
 
 def deduplicate(records: Iterable[RawRecord]) -> DedupResult:

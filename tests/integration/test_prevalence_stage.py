@@ -309,3 +309,20 @@ def test_prevalence_stratifies_by_the_called_subtype_when_calls_exist(workspace)
         r["stratum_kind"] for r in read_tsv(tmp / "results" / "kenya" / "drm" / "prevalence.tsv")
     }
     assert "subtype_called" in kinds and "subtype_reported" not in kinds
+
+
+def test_country_strata_appear_only_when_asked_for(workspace):
+    settings, tmp = workspace
+    meta = tmp / "interim" / "kenya" / "metadata.valid.tsv"
+    rows = read_tsv(meta)
+    for r in rows:
+        r["country"] = "Kenya" if int(r["strain"][1:]) % 2 else "Uganda"
+    write_tsv(meta, rows, ["strain", "year", "subtype_reported", "clone_derived", "country"])
+    run_prevalence(settings)
+    assert "country" not in {r["stratum_kind"] for r in _rows(tmp)}
+    on = settings.model_copy(
+        update={"prevalence": settings.prevalence.model_copy(update={"by_country": True})}
+    )
+    run_prevalence(on)
+    countries = {r["stratum"] for r in _rows(tmp, stratum_kind="country")}
+    assert countries == {"Kenya", "Uganda"}

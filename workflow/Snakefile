@@ -51,7 +51,7 @@ def terminal_outputs():
     if PHYLO_ENABLED:
         outputs += [
             f"{RESULTS}/phylo/tree.nwk",
-            f"{PATHS['auspice']}/virotrace_{SCOPE}_pol.json",
+            f"{PATHS['auspice']}/virotrace_{SCOPE}.json",
         ]
     return outputs
 

@@ -160,6 +160,7 @@ drm:
 prevalence:
   strata: [year_bin, drug_class]
   also_by_subtype: true
+  by_country: false      # a stratum per country; on for the multi-country Africa profile
   ci_method: wilson
   ci_level: 0.95
   min_stratum_n: 10              # below this: "n too small", not a plotted point
@@ -188,6 +189,7 @@ phylo:
     require_positive_slope: true
     date_randomisation: false    # true at kenya scope once n is known
   traits:
+    enabled: false   # `phylo traits` is not implemented yet; the DAG leaves the rule out while false
     columns: [country_code, region]
     admin1:
       enabled: auto              # auto = only if resolved fraction clears the threshold

@@ -160,6 +160,7 @@ class DRMConfig(_Base):
 class PrevalenceConfig(_Base):
     strata: list[str] = ["year_bin", "drug_class"]
     also_by_subtype: bool = True
+    by_country: bool = False  # a stratum per country; for multi-country scopes
     ci_method: Literal["wilson"] = "wilson"
     ci_level: float = Field(0.95, gt=0, lt=1)
     min_stratum_n: int = Field(10, ge=1)
@@ -186,6 +187,7 @@ class Admin1Config(_Base):
 
 
 class TraitsConfig(_Base):
+    enabled: bool = False  # `phylo traits` is not implemented yet; the DAG skips it while False
     columns: list[str] = ["country_code", "region"]
     admin1: Admin1Config = Admin1Config()
 

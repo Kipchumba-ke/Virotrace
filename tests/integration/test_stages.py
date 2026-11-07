@@ -132,8 +132,8 @@ def test_capped_trial_run_has_its_own_snapshot_identity(config_path, tmp_path, r
     assert capped.query_description().endswith("max_records=20")
 
 
-def test_unimplemented_and_unknown_sources_fail_clearly(config_path, tmp_path, records_toy_tsv):
-    for source, message in (("lanl", "not implemented"), ("nope", "unknown acquire source")):
+def test_unknown_sources_fail_clearly(config_path, tmp_path, records_toy_tsv):
+    for source, message in (("nope", "unknown acquire source"),):
         settings = _settings(config_path, tmp_path, records_toy_tsv, acquire={"sources": [source]})
         with pytest.raises(ConfigError, match=message):
             build_adapters(settings)

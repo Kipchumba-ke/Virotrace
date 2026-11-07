@@ -11,12 +11,12 @@ def auspice_inputs(wildcards):
             {
                 "tree": rules.refine.output.tree,
                 "node_data": rules.refine.output.node_data,
-                "traits": rules.traits.output.traits,
                 "gate": rules.refine.output.gate,
+                "clusters": rules.clusters.output.clusters,
             }
         )
-    if PHYLO_ENABLED and config["phylo"]["clusters"]["enabled"]:
-        required["clusters"] = rules.clusters.output.clusters
+        if SUBTYPE_TREES:
+            required["subtrees"] = rules.subtrees.output.tree
     return required
 
 
@@ -37,7 +37,10 @@ rule export_auspice:
     input:
         unpack(auspice_inputs),
     output:
-        auspice=f"{PATHS['auspice']}/virotrace_{SCOPE}_pol.json",
+        auspice=[
+            f"{PATHS['auspice']}/virotrace_{SCOPE}.json",
+            *expand(f"{PATHS['auspice']}/virotrace_{SCOPE}_{{subtype}}.json", subtype=SUBTYPE_TREES),
+        ],
     log:
         f"logs/{SCOPE}/export_auspice.log",
     shell:

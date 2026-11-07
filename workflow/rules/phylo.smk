@@ -40,16 +40,43 @@ rule refine:
         "virotrace phylo refine {CONFIG_ARGS} > {log} 2>&1"
 
 
-rule traits:
-    input:
-        tree=rules.refine.output.tree,
-        meta=rules.subsample.output.meta,
-    output:
-        traits=f"{RESULTS}/phylo/traits.json",
-    log:
-        f"logs/{SCOPE}/traits.log",
-    shell:
-        "virotrace phylo traits {CONFIG_ARGS} > {log} 2>&1"
+SUBTYPE_TREES = config["phylo"]["refine"]["subtype_trees"]
+
+
+if SUBTYPE_TREES:  # dev has none; an empty rule would have no outputs
+
+    rule subtrees:
+        """One tree per configured subtype, each with its own temporal gate.
+
+        A pooled multi-subtype tree rarely has a usable clock; a subtype's own tree often
+        does. Each subtype gets IQ-TREE, the gate, and a time tree only if its gate passes.
+        """
+        input:
+            tree_aln=rules.subsample.output.tree_aln,
+            meta=rules.subsample.output.meta,
+        output:
+            tree=expand(f"{RESULTS}/phylo/{{subtype}}/tree.refined.nwk", subtype=SUBTYPE_TREES),
+            node_data=expand(f"{RESULTS}/phylo/{{subtype}}/branch_lengths.json", subtype=SUBTYPE_TREES),
+            gate=expand(f"{RESULTS}/phylo/{{subtype}}/temporal_gate.json", subtype=SUBTYPE_TREES),
+        log:
+            f"logs/{SCOPE}/subtrees.log",
+        threads: config["threads"]
+        shell:
+            "virotrace phylo subtrees {CONFIG_ARGS} > {log} 2>&1"
+
+
+if config["phylo"]["traits"]["enabled"]:
+
+    rule traits:
+        input:
+            tree=rules.refine.output.tree,
+            meta=rules.subsample.output.meta,
+        output:
+            traits=f"{RESULTS}/phylo/traits.json",
+        log:
+            f"logs/{SCOPE}/traits.log",
+        shell:
+            "virotrace phylo traits {CONFIG_ARGS} > {log} 2>&1"
 
 
 rule clusters:
@@ -59,6 +86,8 @@ rule clusters:
         drm=rules.drm_call.output.table,
     output:
         clusters=f"{RESULTS}/phylo/clusters.tsv",
+        summary=f"{RESULTS}/phylo/clusters_summary.json",
+        near_identical=f"{RESULTS}/qc/near_identical_pairs.tsv",
     log:
         f"logs/{SCOPE}/clusters.log",
     threads: config["threads"]
