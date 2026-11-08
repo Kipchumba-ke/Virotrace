@@ -269,6 +269,9 @@ class SubtypeConfig(_Base):
     annotate_crfs: bool = True  # second placement with CRFs; annotation only
     min_overlap_sites: int = Field(300, ge=1)  # comparable sites needed for any call
     on_disagreement: Literal["report"] = "report"
+    # `phylo subtype-tree`: minimum UFBoot (percent) on the branch that joins a sequence to a
+    # reference clade; below it the tree call is unresolved. Ignored when the tree has no support.
+    tree_min_support: float = Field(95.0, ge=0, le=100)
 
 
 class RecombinationConfig(_Base):

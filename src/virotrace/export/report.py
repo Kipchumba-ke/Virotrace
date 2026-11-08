@@ -24,6 +24,8 @@ METHODS_DOC = Path("docs/04-bioinformatics-methodology.md")
 NOT_RUN = "Not generated for this build."
 
 EXTRA_LIMITATIONS = [
+    "Sequences come from GenBank only. LANL was not used, so records without a GenBank "
+    "country qualifier, or whose country LANL curated, are not in the corpus.",
     "Prevalence is for published sequences, not transmitted drug resistance: most studies "
     "sampled people on or after treatment, and study treatment context comes from hand-curated "
     "annotations, with unreviewed studies shown as unannotated.",
@@ -89,12 +91,30 @@ def _prevalence_sections(results: Path) -> str:
     out = []
     for role, title in (
         ("headline", "Headline: WHO 2009 surveillance list"),
-        ("sensitivity", "Sensitivity: current Stanford list"),
+        (
+            "sensitivity",
+            "Sensitivity: current Stanford list (sequences covering all its positions)",
+        ),
+        (
+            "sensitivity_headline_denominator",
+            "Sensitivity: current Stanford list, same people as the headline",
+        ),
     ):
         sub = [r for r in rows if r["list_role"] == role]
         if not sub:
             continue
         out.append(f"<h3>{escape(title)} (version {escape(sub[0]['list_version'])})</h3>")
+        if role == "sensitivity":
+            out.append(
+                "<p>Only sequences covering every position of this list are counted, so the "
+                "denominators are smaller than the headline's and the percentages are not "
+                "comparable to it. Use the next table for a like-for-like comparison.</p>"
+            )
+        if role == "sensitivity_headline_denominator":
+            out.append(
+                "<p>The same people as the headline, with Stanford's mutations called at the "
+                "positions each sequence covers: a lower bound, comparable to the headline.</p>"
+            )
         kinds = list(dict.fromkeys(r["stratum_kind"] for r in sub))
         for kind in kinds:
             strata = list(dict.fromkeys(r["stratum"] for r in sub if r["stratum_kind"] == kind))

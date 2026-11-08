@@ -12,6 +12,7 @@ IQ-TREE or augur installed.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from collections.abc import Callable, Sequence
@@ -199,15 +200,27 @@ def run_refine(
     repo_root: Path | str = ".",
     runner: Runner = subprocess_runner,
     subtype: str | None = None,
+    out_dir: Path | None = None,
+    gate: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """``out_dir`` writes the refine outputs elsewhere (a sensitivity run); ``gate`` reuses an
+    existing gate result instead of recomputing it, permutation test included."""
     p = _paths(settings, Path(repo_root), subtype)
     for key, stage in (("tree", "phylo tree"), ("meta", "subsample"), ("aln", "subsample")):
         if not p[key].exists():
             raise ContractError(f"{p[key]} not found; run `virotrace {stage}` first")
+    if out_dir is not None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        p = {**p, "phylo": out_dir}
     rows = read_tsv(p["meta"])
     tree = parse_newick(p["tree"].read_text())
     gate_cfg = settings.phylo.temporal_gate
-    gate = _gate(settings, tree, rows) if gate_cfg.enabled else {"pooled": {"passed": True}}
+    if gate is not None:
+        gate = dict(gate)
+    elif gate_cfg.enabled:
+        gate = _gate(settings, tree, rows)
+    else:
+        gate = {"pooled": {"passed": True}}
     use_time = settings.phylo.refine.enabled and (not gate_cfg.enabled or gate["pooled"]["passed"])
     gate["time_tree"] = use_time
     if gate_cfg.enabled and not gate["pooled"]["passed"]:
@@ -265,3 +278,157 @@ def run_subtype_trees(
             "slope": gate["pooled"].get("slope"),
         }
     return {"scope": settings.scope, "subtype_trees": out}
+
+
+def _clock_summary(node_data: Path) -> dict[str, float | None]:
+    data = json.loads(node_data.read_text())
+    dates = [n["numdate"] for n in data.get("nodes", {}).values() if "numdate" in n]
+    return {
+        "clock_rate": (data.get("clock") or {}).get("rate"),
+        "root_date": round(min(dates), 2) if dates else None,
+        "latest_date": round(max(dates), 2) if dates else None,
+    }
+
+
+def run_clock_sensitivity(
+    settings: Settings,
+    rates: Sequence[float] | None = None,
+    *,
+    repo_root: Path | str = ".",
+    runner: Runner = subprocess_runner,
+    subtypes: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Refit each dated tree with the clock rate fixed, to see how much its dates depend on it.
+
+    Estimated rates in this corpus are low (A1 about 0.0005 and D about 0.0007 substitutions per
+    site per year, below the configured prior of 0.0008 to 0.0030), so the root date is the
+    quantity that moves. The default rates are the two ends of ``refine.clock_rate_prior``. A tree that
+    failed its temporal gate is refused: fixing a rate on it would manufacture a timeline. The
+    topology is reused; only the dating is redone, into ``clock_<rate>/`` beside the main run.
+    """
+    cfg = settings.phylo.refine
+    rates = list(rates) if rates else list(cfg.clock_rate_prior)
+    targets: list[str | None] = list(subtypes) if subtypes else list(cfg.subtype_trees) or [None]
+    out: dict[str, Any] = {}
+    for subtype in targets:
+        p = _paths(settings, Path(repo_root), subtype)
+        gate_path, base_data = p["phylo"] / "temporal_gate.json", p["phylo"] / "branch_lengths.json"
+        label = subtype or "pooled"
+        step = "phylo refine" if subtype is None else "phylo subtrees"
+        if not gate_path.exists():
+            raise ContractError(f"{p['phylo']} has no refined tree; run `virotrace {step}` first")
+        gate = json.loads(gate_path.read_text())
+        if not gate.get("time_tree"):
+            raise ContractError(
+                f"the {label} tree failed its temporal gate, so it has no dates to test; "
+                "a fixed rate would not repair that"
+            )
+        if not base_data.exists():
+            raise ContractError(f"{base_data} not found; run `virotrace {step}` first")
+        base = _clock_summary(base_data)
+        runs = {}
+        for rate in rates:
+            fixed = settings.model_copy(
+                update={
+                    "phylo": settings.phylo.model_copy(
+                        update={"refine": cfg.model_copy(update={"clock_rate": rate})}
+                    )
+                }
+            )
+            folder = p["phylo"] / f"clock_{rate:g}"
+            run_refine(
+                fixed, repo_root=repo_root, runner=runner, subtype=subtype,
+                out_dir=folder, gate=gate,
+            )  # fmt: skip
+            summary = _clock_summary(folder / "branch_lengths.json")
+            shift = (
+                round(summary["root_date"] - base["root_date"], 2)
+                if summary["root_date"] is not None and base["root_date"] is not None
+                else None
+            )
+            runs[f"{rate:g}"] = {**summary, "root_shift_years": shift}
+        out[label] = {"estimated": base, "fixed": runs}
+        result = {"scope": settings.scope, "tree": label, **out[label]}
+        (p["phylo"] / "clock_sensitivity.json").write_text(
+            json.dumps(result, indent=2, sort_keys=True) + "\n"
+        )
+    return {"scope": settings.scope, "clock_sensitivity": out}
+
+
+def run_subtype_tree(
+    settings: Settings, *, repo_root: Path | str = ".", runner: Runner = subprocess_runner
+) -> dict[str, Any]:
+    """Second subtype call from a tree of the pure-subtype panel plus the tree set."""
+    from ..curate.subtype import agreement, panel_label, parent_group, pure_rows
+    from .subtype_tree import concordance, tree_subtype_calls
+
+    root = Path(repo_root)
+    p = _paths(settings, root)
+    panel_path = root / settings.paths["interim"] / settings.scope / "panel.pol.fasta"
+    for path, stage in ((panel_path, "subtype"), (p["aln"], "subsample"), (p["meta"], "subsample")):
+        if not path.exists():
+            raise ContractError(f"{path} not found; run `virotrace {stage}` first")
+
+    query = list(read_fasta(p["aln"]))
+    unusable = [all(c in "N-" for c in col) for col in zip(*(q for _, q in query), strict=True)]
+    panel_rows = pure_rows(list(read_fasta(panel_path)))
+    if len(panel_rows) < 4:
+        raise ContractError("the pure-subtype panel has too few references to build a tree")
+    width = len(query[0][1])
+    safe = lambda n: "ref_" + re.sub(r"[^A-Za-z0-9_.\-]", "_", n)  # noqa: E731
+    labelled: dict[str, str] = {}
+    rows: list[tuple[str, str]] = []
+    for name, seq in panel_rows:
+        if len(seq) != width:
+            raise ContractError(f"panel width {len(seq)} != tree alignment width {width}")
+        masked = "".join("N" if u else c for c, u in zip(seq, unusable, strict=True))
+        labelled[safe(name)] = panel_label(name)
+        rows.append((safe(name), masked))
+    out_dir = p["phylo"] / "subtype_tree"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    aln = out_dir / "aln.fasta"
+    write_fasta(aln, rows + query, wrap=0)
+
+    prefix = out_dir / "iqtree"
+    for stale in out_dir.glob("iqtree.*"):
+        stale.unlink()
+    runner(iqtree_command(settings, aln, prefix))
+    treefile = prefix.with_suffix(".treefile")
+    if not treefile.exists():
+        raise ContractError(f"{treefile} was not written; see {prefix}.log")
+    tree = parse_newick(treefile.read_text())
+
+    groups = {lab: parent_group(lab) for lab in set(labelled.values())}
+    cfg = settings.subtype
+    calls = tree_subtype_calls(tree, labelled, groups, min_support=cfg.tree_min_support)
+    meta = {r["strain"]: r for r in read_tsv(p["meta"])}
+    table = []
+    for strain, c in calls.items():
+        m = meta.get(strain, {})
+        table.append(
+            {
+                "strain": strain, "subtype_tree": c["call"], "tree_level": c["level"],
+                "tree_support": "" if c["support"] is None else c["support"],
+                "subtype_called": m.get("subtype_called", ""), "crf_label": m.get("crf_label", ""),
+                "subtype_reported": m.get("subtype_reported", ""),
+            }
+        )  # fmt: skip
+    summary, confusion = concordance(table, agreement)
+    write_tsv(out_dir / "subtype_calls_tree.tsv", table)
+    write_tsv(
+        out_dir / "subtype_disagreements.tsv",
+        [r for r in table if r["concordance"] == "disagree"],
+        list(table[0]) if table else None,
+    )
+    result = {
+        "scope": settings.scope,
+        "n_queries": len(table),
+        "n_references": len(rows),
+        "concordance": summary,
+        "confusion_called_vs_tree": confusion,
+        "min_support": cfg.tree_min_support,
+    }
+    (out_dir / "subtype_tree_summary.json").write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n"
+    )
+    return result

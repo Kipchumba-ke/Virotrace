@@ -339,6 +339,54 @@ def panel_self_check(
     }
 
 
+DISAGREEMENT_COLUMNS = [
+    "study_key",
+    "country",
+    "subtype_called",
+    "subtype_reported",
+    "n",
+    "median_support",
+    "median_nearest_distance",
+    "median_n_sites",
+]
+
+
+def disagreements_by_study(
+    rows: list[dict[str, Any]], meta: dict[str, dict[str, str]]
+) -> list[dict[str, Any]]:
+    """Where the depositor label and the call disagree: counts by study, country and label pair.
+
+    A pair concentrated in one study points at a labelling or scoping problem in that study;
+    one spread across studies, with low support, points at the caller.
+    """
+    groups: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+    for r in rows:
+        if r["subtype_agreement"] != "disagree":
+            continue
+        m = meta.get(r["strain"], {})
+        key = (
+            m.get("study_key", "") or "unknown",
+            m.get("country", "") or "unknown",
+            r["subtype_called"],
+            r["subtype_reported"],
+        )
+        groups.setdefault(key, []).append(r)
+
+    def med(members: list[dict[str, Any]], col: str) -> float | str:
+        vals = [float(m[col]) for m in members if str(m[col]).strip() != ""]
+        return round(float(np.median(vals)), 4) if vals else ""
+
+    out = [
+        {
+            "study_key": k[0], "country": k[1], "subtype_called": k[2], "subtype_reported": k[3],
+            "n": len(v), "median_support": med(v, "subtype_support"),
+            "median_nearest_distance": med(v, "nearest_distance"), "median_n_sites": med(v, "n_sites"),
+        }
+        for k, v in groups.items()
+    ]  # fmt: skip
+    return sorted(out, key=lambda r: (-r["n"], r["study_key"]))
+
+
 def run_subtype(
     settings: Settings, *, repo_root: Path | str = ".", runner: Runner = mafft_runner
 ) -> dict[str, Any]:
@@ -418,6 +466,13 @@ def run_subtype(
     if len(rows) != len(passed):
         raise ContractError(f"subtype lost records: {len(passed)} passed QC, {len(rows)} called")
     write_tsv(interim / "subtype_calls.tsv", rows, CALL_COLUMNS)
+
+    by_strain = {r["strain"]: r for r in meta}
+    write_tsv(
+        results / "qc" / "subtype_disagreements_by_study.tsv",
+        disagreements_by_study(rows, by_strain),
+        DISAGREEMENT_COLUMNS,
+    )
 
     summary = {
         "scope": scope,

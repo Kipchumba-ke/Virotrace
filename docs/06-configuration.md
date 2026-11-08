@@ -123,6 +123,7 @@ subtype:
   reference_panel: subtype_references.fasta
   min_support: 0.70
   on_disagreement: report        # report | prefer_placement | prefer_external
+  tree_min_support: 95.0   # `phylo subtype-tree`: UFBoot % needed on the joining branch
 
 recombination:
   enabled: true

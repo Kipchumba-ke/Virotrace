@@ -102,6 +102,7 @@ subtype:
   include_crfs: null             # null = every CRF in the panel; or a list, e.g. [01_AE, 02_AG]
   min_overlap_sites: 300         # comparable sites needed before any call is made
   on_disagreement: report
+  tree_min_support: 95.0   # `phylo subtype-tree`: UFBoot % needed on the joining branch
 
 recombination:
   enabled: true

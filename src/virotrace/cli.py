@@ -290,6 +290,50 @@ def phylo_subtrees(
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
+@phylo_app.command("clock-sensitivity")
+def phylo_clock_sensitivity(
+    config: ConfigOpt = Path("config/config.yaml"),
+    profile: ProfileOpt = None,
+    rate: Annotated[
+        list[float] | None,
+        typer.Option(
+            "--rate",
+            help="Fixed substitutions/site/year; repeat for several. "
+            "Default: both ends of refine.clock_rate_prior.",
+        ),
+    ] = None,
+    subtype: Annotated[
+        list[str] | None, typer.Option("--subtype", help="Default: every configured subtype tree.")
+    ] = None,
+) -> None:
+    """L3b: refit the dated trees at fixed clock rates and report how the root date moves."""
+    from .phylo.stage import run_clock_sensitivity
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_clock_sensitivity(settings, rate, subtypes=subtype)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+
+
+@phylo_app.command("subtype-tree")
+def phylo_subtype_tree(
+    config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
+) -> None:
+    """L3b: a second, tree-based subtype call, compared with the distance placement."""
+    from .phylo.stage import run_subtype_tree
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_subtype_tree(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+
+
 @phylo_app.command("traits")
 def phylo_traits(
     config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None

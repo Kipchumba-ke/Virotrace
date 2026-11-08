@@ -11,9 +11,15 @@ import pytest
 
 from virotrace.errors import ContractError
 from virotrace.io.fasta import write_fasta
-from virotrace.io.tables import write_tsv
+from virotrace.io.tables import read_tsv, write_tsv
 from virotrace.phylo.newick import midpoint_edge, parse_newick, tip_distances, to_newick
-from virotrace.phylo.stage import augur_date, iqtree_command, run_refine, run_tree
+from virotrace.phylo.stage import (
+    augur_date,
+    iqtree_command,
+    run_clock_sensitivity,
+    run_refine,
+    run_tree,
+)
 from virotrace.phylo.temporal import (
     best_root_to_tip,
     decimal_year,
@@ -290,3 +296,114 @@ def test_subtype_trees_get_their_own_inputs_gate_and_directory(workspace):
     assert "--timetree" in calls[-1]
     with pytest.raises(ContractError):  # D has one tip: no tree to build
         run_tree(settings, repo_root=".", runner=runner, subtype="D")
+
+
+def _dating_runner(root_by_rate: dict[str, float], base_rate: float = 0.0005):
+    """Fake augur refine: writes branch_lengths.json whose root date depends on the rate."""
+
+    def runner(command):
+        out = Path(command[command.index("--output-node-data") + 1])
+        rate = command[command.index("--clock-rate") + 1] if "--clock-rate" in command else None
+        root = root_by_rate[rate] if rate else 1960.0
+        used = float(rate) if rate else base_rate
+        out.write_text(
+            json.dumps({"clock": {"rate": used},
+                        "nodes": {"NODE_0": {"numdate": root}, "T0": {"numdate": 2015.0}}})
+        )  # fmt: skip
+        Path(command[command.index("--output-tree") + 1]).write_text("(T0:1);\n")
+
+    return runner
+
+
+def test_clock_sensitivity_refits_at_each_rate_beside_the_main_run(workspace):
+    settings, tmp = workspace
+    _meta(tmp, YEARS)
+    run_tree(settings, repo_root=".", runner=_fake_iqtree(_clock_tree(YEARS, odd_root=False)))
+    run_refine(settings, repo_root=".", runner=_dating_runner({}))
+    phylo = tmp / "results/kenya/phylo"
+    commands = []
+    inner = _dating_runner({"0.0008": 1985.0, "0.003": 1996.5})
+
+    def runner(command):
+        commands.append(command)
+        inner(command)
+
+    out = run_clock_sensitivity(settings, repo_root=".", runner=runner)["clock_sensitivity"]
+    assert all("--clock-rate" in c and "--timetree" in c for c in commands) and len(commands) == 2
+    pooled = out["pooled"]
+    assert pooled["estimated"] == {"clock_rate": 0.0005, "root_date": 1960.0, "latest_date": 2015.0}
+    assert pooled["fixed"]["0.0008"]["root_shift_years"] == 25.0
+    assert pooled["fixed"]["0.003"]["root_date"] == 1996.5
+    assert (phylo / "clock_0.0008/branch_lengths.json").exists()
+    assert json.loads((phylo / "clock_sensitivity.json").read_text())["tree"] == "pooled"
+    # the main run's own outputs are untouched
+    assert json.loads((phylo / "branch_lengths.json").read_text())["clock"]["rate"] == 0.0005
+
+
+def test_clock_sensitivity_refuses_a_tree_that_failed_its_gate(workspace):
+    settings, tmp = workspace
+    shuffled = [2012.0, 2000.0, 2015.0, 2003.0, 2009.0, 2006.0]
+    _meta(tmp, shuffled)
+    run_tree(settings, repo_root=".", runner=_fake_iqtree(_clock_tree(YEARS, odd_root=False)))
+    strict = settings.model_copy(
+        update={"phylo": settings.phylo.model_copy(update={
+            "temporal_gate": settings.phylo.temporal_gate.model_copy(update={"min_temporal_r2": 0.9})
+        })}
+    )  # fmt: skip
+    run_refine(strict, repo_root=".", runner=lambda c: None)
+    with pytest.raises(ContractError, match="failed its temporal gate"):
+        run_clock_sensitivity(strict, repo_root=".", runner=lambda c: None)
+    with pytest.raises(ContractError, match="phylo subtrees"):
+        run_clock_sensitivity(strict, repo_root=".", subtypes=["D"], runner=lambda c: None)
+
+
+def test_subtype_tree_stage_builds_the_alignment_calls_and_compares(workspace):
+    from virotrace.phylo.stage import run_subtype_tree
+
+    settings, tmp = workspace
+    names = [f"T{i}" for i in range(6)]
+    width = 8
+    write_fasta(
+        tmp / "processed/kenya/aln.tree.fasta",
+        [(n, "ACGTNNNN") for n in names],
+        wrap=0,
+    )
+    write_tsv(
+        tmp / "processed/kenya/metadata.final.tsv",
+        [{"strain": n, "subtype_called": "A1" if i < 3 else "D", "subtype_reported": "A1"}
+         for i, n in enumerate(names)],
+    )  # fmt: skip
+    panel = [(f"{lab}.KE.00.r{i}.AB00000{i}", "ACGTACGT") for i, lab in enumerate(
+        ["A1", "A1", "D", "D", "CRF01_AE"]
+    )]  # fmt: skip
+    (tmp / "interim/kenya").mkdir(parents=True)
+    write_fasta(tmp / "interim/kenya/panel.pol.fasta", panel, wrap=0)
+
+    seen = {}
+
+    def runner(command):
+        aln = Path(command[command.index("-s") + 1])
+        seen["names"] = [
+            n for n, _ in __import__("virotrace.io.fasta", fromlist=["x"]).read_fasta(aln)
+        ]
+        seen["seqs"] = dict(__import__("virotrace.io.fasta", fromlist=["x"]).read_fasta(aln))
+        prefix = Path(command[command.index("--prefix") + 1])
+        r = {n: n for n in seen["names"]}
+        text = (
+            f"(({r['ref_A1.KE.00.r0.AB000000']}:1,T0:1)95:1,{r['ref_A1.KE.00.r1.AB000001']}:1,"
+            f"(({r['ref_D.KE.00.r2.AB000002']}:1,T3:1)96:1,{r['ref_D.KE.00.r3.AB000003']}:1)99:1,"
+            "T1:1,T2:1,T4:1,T5:1);"
+        )
+        prefix.with_suffix(".treefile").write_text(text + "\n")
+
+    out = run_subtype_tree(settings, repo_root=".", runner=runner)
+    assert (
+        width == len(seen["seqs"]["T0"]) and out["n_references"] == 4
+    )  # the CRF reference is dropped
+    assert seen["seqs"]["ref_A1.KE.00.r0.AB000000"] == "ACGTNNNN"  # masked where queries are all N
+    d = tmp / "results/kenya/phylo/subtype_tree"
+    rows = {r["strain"]: r for r in read_tsv(d / "subtype_calls_tree.tsv")}
+    assert rows["T0"]["subtype_tree"] == "A1" and rows["T0"]["concordance"] == "agree"
+    assert rows["T3"]["subtype_tree"] == "D" and rows["T3"]["concordance"] == "agree"
+    assert rows["T1"]["subtype_tree"] == "unresolved"
+    assert (d / "subtype_disagreements.tsv").exists() and out["concordance"]["agree"] == 2

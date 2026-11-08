@@ -7,7 +7,13 @@ import json
 import pytest
 
 from virotrace.errors import ContractError
-from virotrace.export.auspice import auspice_config, run_export, tip_metadata
+from virotrace.export.auspice import (
+    annotation_flag,
+    auspice_config,
+    genes_gff,
+    run_export,
+    tip_metadata,
+)
 from virotrace.io.fasta import write_fasta
 from virotrace.io.tables import read_tsv, write_tsv
 from virotrace.settings import load_settings
@@ -83,18 +89,28 @@ def test_tip_metadata_has_clusters_treatment_context_and_sdrm_by_class(workspace
 def test_export_runs_ancestral_then_export_for_the_pooled_and_each_subtype_tree(workspace):
     settings, tmp = workspace
     calls = []
-    summary = run_export(settings, repo_root=".", runner=calls.append)
-    assert [c[1] for c in calls] == ["ancestral", "export", "ancestral", "export"]
+    summary = run_export(
+        settings, repo_root=".", runner=calls.append, translate_help=lambda: "--annotation"
+    )
+    assert [c[1] for c in calls] == [
+        "ancestral", "translate", "export", "ancestral", "translate", "export",
+    ]  # fmt: skip
     pooled, a1 = summary["datasets"]["pooled"], summary["datasets"]["A1"]
     assert "divergence tree" in pooled["title"] and not pooled["time_tree"]
     assert "subtype A1, time tree" in a1["title"] and a1["time_tree"]
     assert pooled["dataset"].endswith("virotrace_kenya.json")
     assert a1["dataset"].endswith("virotrace_kenya_A1.json")
-    export = calls[3]
+    export = calls[5]
     assert export[export.index("--output") + 1] == a1["dataset"]
     assert any(str(a).endswith("branch_lengths.json") for a in export)
     assert str(tmp / "results/kenya/phylo/A1/nt_muts.json") in export
-    assert str(tmp / "processed/kenya/aln.tree.A1.fasta") in calls[2]
+    assert str(tmp / "processed/kenya/aln.tree.A1.fasta") in calls[3]
+    translate = calls[4]
+    assert translate[translate.index("--annotation") + 1].endswith("pol_genes.gff3")
+    assert translate[translate.index("--genes") + 1 : translate.index("--genes") + 4] == [
+        "PR", "RT", "IN",
+    ]  # fmt: skip
+    assert str(tmp / "results/kenya/phylo/A1/aa_muts.json") in export
     config = json.loads((tmp / "results/kenya/phylo/A1/auspice_config.json").read_text())
     assert {c["key"] for c in config["colorings"]} >= {"subtype", "cluster", "study"}
     assert read_tsv(tmp / "results/kenya/phylo/auspice_metadata.tsv")[0]["strain"] == "s1"
@@ -109,7 +125,25 @@ def test_missing_inputs_name_the_stage_to_run(workspace):
     settings, tmp = workspace
     (tmp / "results/kenya/phylo/A1/tree.refined.nwk").unlink()
     with pytest.raises(ContractError, match="phylo subtrees"):
-        run_export(settings, repo_root=".", runner=lambda c: None)
+        run_export(
+            settings, repo_root=".", runner=lambda c: None, translate_help=lambda: "--annotation"
+        )
     (tmp / "results/kenya/phylo/clusters.tsv").unlink()
     with pytest.raises(ContractError, match="phylo clusters"):
-        run_export(settings, repo_root=".", runner=lambda c: None)
+        run_export(
+            settings, repo_root=".", runner=lambda c: None, translate_help=lambda: "--annotation"
+        )
+
+
+def test_gene_coordinates_are_in_the_pol_alignment_frame_and_the_old_flag_is_still_chosen(
+    workspace,
+):
+    settings, _ = workspace
+    rows = [line.split("\t") for line in genes_gff(settings).splitlines()[1:]]
+    spans = {r[8].split(";")[0]: (int(r[3]), int(r[4])) for r in rows if r[2] == "CDS"}
+    assert spans == {"ID=PR": (169, 465), "ID=RT": (466, 2145), "ID=IN": (2146, 3009)}
+    assert all((end - start + 1) % 3 == 0 for start, end in spans.values())
+    assert annotation_flag("usage: augur translate [--annotation ANNOTATION]") == "--annotation"
+    assert (
+        annotation_flag("usage: augur translate [--reference-sequence X]") == "--reference-sequence"
+    )

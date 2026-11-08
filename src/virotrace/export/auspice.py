@@ -1,7 +1,8 @@
 """Auspice export: one dataset for the pooled tree and one for each per-subtype tree.
 
-For each tree this runs ``augur ancestral`` (nucleotide mutations on branches) and
-``augur export v2``. Tip metadata is assembled here from the stage outputs, so the colour-by
+For each tree this runs ``augur ancestral`` (nucleotide mutations on branches),
+``augur translate`` (amino-acid mutations in PR, RT and IN, so a resistance mutation such as
+RT 184V is a branch mutation and a genotype colouring) and ``augur export v2``. Tip metadata is assembled here from the stage outputs, so the colour-by
 choices (subtype, cluster, study, treatment context, SDRM status per drug class) come from
 the same tables the reports use, not from a second copy of the logic.
 
@@ -13,6 +14,8 @@ tree unless its temporal gate passed; each dataset's title says which it is.
 from __future__ import annotations
 
 import json
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -130,13 +133,51 @@ def auspice_config(title: str, columns: list[str]) -> dict[str, Any]:
     }
 
 
+def genes_gff(settings: Settings) -> str:
+    """GFF3 for PR, RT and IN in the coordinates of the pol alignment.
+
+    Alignment column 1 is the first base of pol (HXB2 position ``reference.genes.pol[0]``),
+    so a gene at HXB2 ``a..b`` is columns ``a - start + 1 .. b - start + 1``. All three genes
+    start in the pol frame.
+    """
+    genes = settings.reference.genes
+    start = genes.pol[0]
+    lines = ["##gff-version 3"]
+    for gene, (a, b) in (("PR", genes.pr), ("RT", genes.rt), ("IN", genes.in_)):
+        first, last = a - start + 1, b - start + 1
+        attrs = f"ID={gene};Name={gene};gene={gene};locus_tag={gene}"
+        lines.append(f"pol\tvirotrace\tgene\t{first}\t{last}\t.\t+\t.\t{attrs}")
+        lines.append(f"pol\tvirotrace\tCDS\t{first}\t{last}\t.\t+\t0\t{attrs};Parent={gene}")
+    return "\n".join(lines) + "\n"
+
+
+def augur_translate_help() -> str:
+    """The installed augur's `translate --help`, to pick the annotation flag it understands."""
+    try:
+        done = subprocess.run(
+            ["augur", "translate", "--help"], capture_output=True, text=True, check=False
+        )
+    except FileNotFoundError as exc:
+        raise ContractError("`augur` is not installed or not on PATH") from exc
+    return done.stdout + done.stderr
+
+
+def annotation_flag(help_text: str) -> str:
+    """Newer augur takes ``--annotation``; older versions took ``--reference-sequence``."""
+    return "--annotation" if "--annotation" in help_text else "--reference-sequence"
+
+
 def _views(settings: Settings, p: dict[str, Path]) -> list[tuple[str | None, Path]]:
     pooled = p["results"] / "phylo"
     return [(None, pooled)] + [(s, pooled / s) for s in settings.phylo.refine.subtype_trees]
 
 
 def run_export(
-    settings: Settings, *, repo_root: Path | str = ".", runner: Runner = subprocess_runner
+    settings: Settings,
+    *,
+    repo_root: Path | str = ".",
+    runner: Runner = subprocess_runner,
+    translate_help: Callable[[], str] = augur_translate_help,
 ) -> dict[str, Any]:
     root = Path(repo_root)
     p = _paths(settings, root)
@@ -149,6 +190,9 @@ def run_export(
     description = p["auspice"] / "description.md"
     description.write_text(DESCRIPTION)
 
+    gff = phylo / "pol_genes.gff3"
+    gff.write_text(genes_gff(settings))
+    flag: str | None = None  # asked of augur only once every input is known to exist
     outputs: dict[str, Any] = {}
     for subtype, folder in _views(settings, p):
         label = subtype or "pooled"
@@ -173,19 +217,25 @@ def run_export(
         config_path.write_text(
             json.dumps(auspice_config(title, columns), indent=2, sort_keys=True) + "\n"
         )
-        muts = folder / "nt_muts.json"
+        muts, aa_muts = folder / "nt_muts.json", folder / "aa_muts.json"
         name = f"virotrace_{settings.scope}" + (f"_{subtype}" if subtype else "")
         output = p["auspice"] / f"{name}.json"
-        for stale in (muts, output):
+        for stale in (muts, aa_muts, output):
             stale.unlink(missing_ok=True)
 
         runner([
             "augur", "ancestral", "--tree", str(tree), "--alignment", str(aln),
             "--inference", "joint", "--output-node-data", str(muts),
         ])  # fmt: skip
+        if flag is None:
+            flag = annotation_flag(translate_help())
+        runner([
+            "augur", "translate", "--tree", str(tree), "--ancestral-sequences", str(muts),
+            flag, str(gff), "--genes", "PR", "RT", "IN", "--output-node-data", str(aa_muts),
+        ])  # fmt: skip
         runner([
             "augur", "export", "v2", "--tree", str(tree), "--metadata", str(metadata),
-            "--metadata-id-columns", "strain", "--node-data", str(node_data), str(muts),
+            "--metadata-id-columns", "strain", "--node-data", str(node_data), str(muts), str(aa_muts),
             "--auspice-config", str(config_path), "--title", title,
             "--description", str(description), "--output", str(output),
         ])  # fmt: skip
