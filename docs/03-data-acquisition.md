@@ -43,6 +43,14 @@ guard `data/` from being committed at all.
 | **GADM / national admin boundaries** | Kenya county geometries for mapping | n/a | Reference data, pinned version, only applied where a record actually supplies subnational location |
 | **WHO HIV drug resistance reports** | Published regional DRM prevalence | n/a | Not ingested. Used in the report's discussion as an external sanity check on magnitude |
 
+**Narrowing a very large query.** The Africa query matches about 187,000 records, and in a
+500-record trial only about a third survived QC, mostly because the rest do not cover PR and RT.
+`acquire.extra_term` adds an Entrez clause (ANDed, so it can only remove records) to the query,
+for example a clause that keeps records naming pol. Compare counts on the NCBI nuccore website
+with and without the clause before trusting it, and check a trial's QC funnel: a clause that is
+too tight silently drops pol records. A query over 100,000 ids is split by publication year
+automatically.
+
 **Running the LANL source.** LANL has no query API, so the adapter reads files you download:
 at hiv.lanl.gov run the Sequence Search (HIV-1, pol region, the countries of your scope), download
 the result as FASTA with the default header `Subtype.Country.Year.Name.Accession`, put the files in

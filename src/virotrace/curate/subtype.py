@@ -232,7 +232,33 @@ def agreement(called: str, reported: str) -> str:
         return "agree"
     if pure.match(b) and a.startswith(b) and a[1:].isdigit():
         return "agree"
+    if b.startswith("URF") or b in {"RECOMBINANT", "REC"}:
+        return "not_comparable"  # the depositor says "unique/unspecified recombinant"
+    if _is_component_of_recombinant_label(called, reported):
+        return "not_comparable"  # the depositor wrote a mosaic (AD, A1D); a pure call is a parent
     return "disagree"
+
+
+_SUBTYPE_TOKEN = re.compile(r"A1|A2|A3|A4|A6|A7|A8|F1|F2|[A-KU]")
+_MOSAIC_LABEL = re.compile(r"(?:A[1-8]?|B|C|D|F[12]?|G|H|J|K|U){2,}")
+
+
+_CRF_LABEL = re.compile(r"(?:CRF)?\d+_(?P<parents>[A-Za-z0-9]+)")
+
+
+def _is_component_of_recombinant_label(called: str, reported: str) -> bool:
+    """A depositor label like ``AD``, ``A1A2D`` or ``CRF02_AG`` names several subtypes; is
+    ``called`` one of them? (A CRF's parents are read from its name: CRF02_AG is A and G.)"""
+    crf = _CRF_LABEL.fullmatch(reported)
+    if crf:
+        parts = _SUBTYPE_TOKEN.findall(crf["parents"])  # "02G" -> [G]; "cpx" -> []
+    elif _MOSAIC_LABEL.fullmatch(reported):
+        parts = _SUBTYPE_TOKEN.findall(reported)
+        if len(parts) < 2:
+            return False
+    else:
+        return False
+    return called in parts or called[:1] in parts
 
 
 def select_panel(rows: list[tuple[str, str]], cfg: Any) -> list[tuple[str, str]]:
@@ -345,6 +371,7 @@ DISAGREEMENT_COLUMNS = [
     "subtype_called",
     "subtype_reported",
     "n",
+    "n_individuals",
     "median_support",
     "median_nearest_distance",
     "median_n_sites",
@@ -352,7 +379,9 @@ DISAGREEMENT_COLUMNS = [
 
 
 def disagreements_by_study(
-    rows: list[dict[str, Any]], meta: dict[str, dict[str, str]]
+    rows: list[dict[str, Any]],
+    meta: dict[str, dict[str, str]],
+    person_of: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Where the depositor label and the call disagree: counts by study, country and label pair.
 
@@ -379,12 +408,14 @@ def disagreements_by_study(
     out = [
         {
             "study_key": k[0], "country": k[1], "subtype_called": k[2], "subtype_reported": k[3],
-            "n": len(v), "median_support": med(v, "subtype_support"),
+            "n": len(v),
+            "n_individuals": len({(person_of or {}).get(r["strain"], r["strain"]) for r in v}),
+            "median_support": med(v, "subtype_support"),
             "median_nearest_distance": med(v, "nearest_distance"), "median_n_sites": med(v, "n_sites"),
         }
         for k, v in groups.items()
     ]  # fmt: skip
-    return sorted(out, key=lambda r: (-r["n"], r["study_key"]))
+    return sorted(out, key=lambda r: (-r["n_individuals"], -r["n"], r["study_key"]))
 
 
 def run_subtype(
@@ -470,7 +501,7 @@ def run_subtype(
     by_strain = {r["strain"]: r for r in meta}
     write_tsv(
         results / "qc" / "subtype_disagreements_by_study.tsv",
-        disagreements_by_study(rows, by_strain),
+        disagreements_by_study(rows, by_strain, person_of),
         DISAGREEMENT_COLUMNS,
     )
 

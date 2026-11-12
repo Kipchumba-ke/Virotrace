@@ -102,9 +102,10 @@ def take_snapshot(
     snapshot_id = make_snapshot_id(date, queries)
 
     out_dir = Path(raw_root) / snapshot_id
-    if out_dir.exists():
+    if (out_dir / "manifest.json").exists():
         raise ContractError(f"snapshot already exists and is immutable: {out_dir}")
-    out_dir.mkdir(parents=True)
+    # A folder with no manifest is the leftover of a run that failed before writing anything
+    # (nothing is created until every record is fetched), so it is safe to reuse.
 
     records: list[RawRecord] = []
     seen: set[str] = set()
@@ -125,6 +126,7 @@ def take_snapshot(
 
     records.sort(key=lambda r: r.accession)
 
+    out_dir.mkdir(parents=True, exist_ok=True)
     seq_path = out_dir / "sequences.fasta"
     write_fasta(seq_path, ((r.accession, r.sequence) for r in records))
 

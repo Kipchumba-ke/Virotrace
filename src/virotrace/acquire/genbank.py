@@ -10,11 +10,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import time
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 from ..errors import ConfigError, ContractError
@@ -23,6 +25,7 @@ from .genbank_parse import parse_genbank
 
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 Transport = Callable[[str, dict[str, str]], str]
+ID_CAP = 100000  # most ids one esearch call returns
 
 # Kenya HIV-1 sequences long enough to plausibly cover pol (>= 1000 nt).
 DEFAULT_TERM = "txid11676[Organism] AND Kenya[Country] AND 1000:10000[SLEN]"
@@ -34,8 +37,13 @@ def build_term(
     min_length: int = 1000,
     max_length: int = 10000,
     taxid: int = 11676,
+    extra: str | None = None,
 ) -> str:
-    """Entrez term. A list of countries becomes an OR group (the Africa scope)."""
+    """Entrez term. A list of countries becomes an OR group (the Africa scope).
+
+    ``extra`` is an extra Entrez clause ANDed on, for narrowing a very large query (for example
+    to records that name pol); it is part of the recorded query, so it changes the snapshot id.
+    """
     countries = [country] if isinstance(country, str) else list(country)
     if not countries:
         raise ConfigError("build_term needs at least one country")
@@ -43,7 +51,10 @@ def build_term(
         place = f"{countries[0]}[Country]"
     else:
         place = "(" + " OR ".join(f"{c}[Country]" for c in countries) + ")"
-    return f"txid{taxid}[Organism] AND {place} AND {min_length}:{max_length}[SLEN]"
+    term = f"txid{taxid}[Organism] AND {place} AND {min_length}:{max_length}[SLEN]"
+    if extra and extra.strip():
+        term += f" AND ({extra.strip()})"
+    return term
 
 
 def _evenly_spaced(ids: list[str], n: int) -> list[str]:
@@ -82,8 +93,10 @@ class GenBankAdapter:
         transport: Transport = default_transport,
         sleep: Callable[[float], None] = time.sleep,
         max_records: int | None = None,
+        cache_dir: Path | str | None = None,
     ) -> None:
         self.term = term
+        self.cache_dir = Path(cache_dir) if cache_dir else None
         self.email = email or os.environ.get("VIROTRACE_NCBI_EMAIL")
         self.api_key = api_key or os.environ.get("VIROTRACE_NCBI_API_KEY")
         self.batch_size = batch_size
@@ -122,22 +135,54 @@ class GenBankAdapter:
                 self.sleep(2.0**attempt)
         raise ContractError(f"Entrez {endpoint} failed after {self.retries} attempts: {last}")
 
-    def _search(self) -> tuple[list[str], int]:
-        """UIDs for the query, in order, plus NCBI's reported total."""
+    def _esearch(self, term: str, retmax: int) -> tuple[list[str], int]:
         import json
 
         params = {
             **self._common(),
             "db": "nuccore",
-            "term": self.term,
+            "term": term,
             "retmode": "json",
-            "retmax": "100000",
+            "retmax": str(retmax),
             "sort": "accession",
         }
         payload: dict[str, Any] = json.loads(self._call("esearch.fcgi", params))
         result = payload.get("esearchresult", {})
         ids = [str(i) for i in result.get("idlist", [])]
         return ids, int(result.get("count", len(ids)))
+
+    def _search(self) -> tuple[list[str], int]:
+        """UIDs for the query, in order, plus NCBI's reported total.
+
+        One esearch returns at most ``ID_CAP`` ids. A larger query (the Africa scope) is cut into
+        disjoint publication-date ranges that each fit, and the ranges are joined in date order.
+        """
+        ids, total = self._esearch(self.term, ID_CAP)
+        if total <= ID_CAP:
+            return ids, total
+        joined = self._search_by_date(1900, 2100)
+        if len(joined) != total:
+            raise ContractError(
+                f"date-split search found {len(joined)} ids but NCBI reports {total} for the "
+                "whole query (records may have been added during the run); retry"
+            )
+        return joined, total
+
+    def _search_by_date(self, first_year: int, last_year: int) -> list[str]:
+        term = f"({self.term}) AND {first_year}/01/01:{last_year}/12/31[PDAT]"
+        ids, count = self._esearch(term, ID_CAP)
+        if count == 0:
+            return []
+        if count <= ID_CAP:
+            return ids
+        if first_year == last_year:
+            raise ContractError(
+                f"{count} records were published in {first_year} alone; narrow the query"
+            )
+        middle = (first_year + last_year) // 2
+        return self._search_by_date(first_year, middle) + self._search_by_date(
+            middle + 1, last_year
+        )
 
     # ---------------------------------------------------------------------- public
     def fetch(self) -> Iterator[RawRecord]:
@@ -152,14 +197,29 @@ class GenBankAdapter:
 
         for start in range(0, len(ids), self.batch_size):
             chunk = ids[start : start + self.batch_size]
-            text = self._call(
-                "efetch.fcgi",
-                {
-                    **self._common(),
-                    "db": "nuccore",
-                    "id": ",".join(chunk),
-                    "rettype": "gb",
-                    "retmode": "text",
-                },
-            )
-            yield from parse_genbank(text, source=self.name)
+            yield from parse_genbank(self._fetch_batch(chunk), source=self.name)
+
+    def _fetch_batch(self, chunk: list[str]) -> str:
+        """One efetch batch, kept on disk so an interrupted download resumes where it stopped."""
+        cached = None
+        if self.cache_dir is not None:
+            digest = hashlib.sha1(("|".join(chunk)).encode()).hexdigest()[:20]
+            cached = self.cache_dir / f"{digest}.gb"
+            if cached.exists():
+                return cached.read_text()
+        text = self._call(
+            "efetch.fcgi",
+            {
+                **self._common(),
+                "db": "nuccore",
+                "id": ",".join(chunk),
+                "rettype": "gb",
+                "retmode": "text",
+            },
+        )
+        if cached is not None:
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            partial = cached.with_suffix(".part")
+            partial.write_text(text)
+            partial.replace(cached)  # a half-written batch is never mistaken for a finished one
+        return text

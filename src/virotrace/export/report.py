@@ -24,6 +24,10 @@ METHODS_DOC = Path("docs/04-bioinformatics-methodology.md")
 NOT_RUN = "Not generated for this build."
 
 EXTRA_LIMITATIONS = [
+    "Country is the GenBank country qualifier. Multi-site trial cohorts (for example the RV217 "
+    "and HVTN 703 isolates) may carry a single country tag for participants enrolled elsewhere; "
+    "participant sites have not been verified, and these participants are a small share of "
+    "individuals.",
     "Sequences come from GenBank only. LANL was not used, so records without a GenBank "
     "country qualifier, or whose country LANL curated, are not in the corpus.",
     "Prevalence is for published sequences, not transmitted drug resistance: most studies "
@@ -37,7 +41,10 @@ EXTRA_LIMITATIONS = [
     "3SEQ; individual calls and breakpoints are provisional.",
     "Dated trees give rough timelines: estimated substitution rates are low, pooled "
     "multi-subtype trees fail the temporal-signal gate, and branch dates carry wide "
-    "uncertainty. Only subtype trees that pass the gate are dated.",
+    "uncertainty. Only subtype trees that pass the gate are dated. Where augur's own rate "
+    "estimate failed or was implausible, the rate is fixed at the gate's regression slope; the "
+    "root dates of such trees mostly reflect the sampling window, are not estimates of when a "
+    "subtype arrived, and are fit for relative timing only.",
     "Clusters are a descriptive TN93 statistic at a fixed threshold on the tree set only, and "
     "undercount; they are not transmission chains. Near-identical sequences within one study "
     "can be repeat sequences from one person that the isolate-name patterns did not recognise.",
@@ -71,7 +78,7 @@ def _estimate(row: dict[str, str]) -> str:
     return "no list positions"
 
 
-def limitations(root: Path) -> list[str]:
+def limitations(root: Path, scope: str = "kenya") -> list[str]:
     path = root / METHODS_DOC
     if not path.exists():
         raise ContractError(f"{path} not found; the report cannot be written without it")
@@ -80,6 +87,15 @@ def limitations(root: Path) -> list[str]:
     items = re.findall(r"^\d+\.\s+(.*)$", match.group(1), re.M) if match else []
     if not items:
         raise ContractError(f"{path} has no numbered limitations in section 9")
+    if scope != "kenya":
+        # the methods document is written for the Kenya build; say what the report is about
+        place = "Africa" if scope == "africa" else scope.capitalize()
+        items = [
+            i.replace("the Kenyan epidemic", f"the {place} epidemic").replace(
+                "Kenya's epidemic is", f"the {place} epidemic is"
+            )
+            for i in items
+        ]
     return items + EXTRA_LIMITATIONS
 
 
@@ -203,7 +219,7 @@ def _data_section(results: Path) -> str:
     return "\n".join(out) or f"<p>{NOT_RUN}</p>"
 
 
-def _gate_row(label: str, gate: dict[str, Any], time_tree: bool) -> list[Any]:
+def _gate_row(label: str, gate: dict[str, Any], time_tree: bool, root: str = "") -> list[Any]:
     return [
         label,
         gate.get("n", ""),
@@ -211,7 +227,7 @@ def _gate_row(label: str, gate: dict[str, Any], time_tree: bool) -> list[Any]:
         gate.get("r_squared", ""),
         gate.get("permutation_p", ""),
         "pass" if gate.get("passed") else "fail",
-        "time tree" if time_tree else "divergence tree",
+        ("time tree" + (f" ({root})" if root else "")) if time_tree else "divergence tree",
     ]
 
 
@@ -225,13 +241,59 @@ def _phylo_section(results: Path, subtypes: list[str]) -> str:
     for s in subtypes:
         sub = _read_json(results / "phylo" / s / "temporal_gate.json")
         if sub:
-            rows.append(_gate_row(f"{s} tree", sub["pooled"], sub.get("time_tree", False)))
+            rows.append(
+                _gate_row(
+                    f"{s} tree", sub["pooled"], sub.get("time_tree", False), sub.get("root", "")
+                )
+            )
     out = [
         "<h3>Temporal signal</h3>",
         _table(["Tree", "Tips", "Slope", "R squared", "Permutation p", "Gate", "Result"], rows),
         "<p>The gate is root-to-tip regression at the best root with a date-randomisation "
         "test. A tree that fails it is shown as a midpoint-rooted divergence tree.</p>",
     ]
+    clock_rows = []
+    for sub_label in subtypes:
+        cs = _read_json(results / "phylo" / sub_label / "clock_sensitivity.json")
+        if not cs:
+            continue
+        est = cs["estimated"]
+        clock_rows.append(
+            [
+                sub_label,
+                "fixed by the pipeline" if est.get("rate_fixed") else "estimated",
+                f"{est['clock_rate']:.5f}",
+                est["root_date"],
+                "",
+            ]
+        )
+        for rate, run in sorted(cs["fixed"].items(), key=lambda kv: float(kv[0])):
+            clock_rows.append(
+                [sub_label, "fixed", rate, run["root_date"], f"{run['root_shift_years']:+.1f}"]
+            )
+    if clock_rows:
+        out += [
+            "<h3>Clock-rate sensitivity</h3>",
+            _table(
+                ["Tree", "Rate", "Substitutions/site/year", "Root date", "Shift (years)"],
+                clock_rows,
+            ),
+            "<p>Root dates move with the assumed rate. Quote a timeline as a range across these "
+            "rates, not as the point estimate.</p>",
+        ]
+    st = _read_json(results / "phylo" / "subtype_tree" / "subtype_tree_summary.json")
+    if st:
+        c = st["concordance"]
+        out += [
+            "<h3>Second subtype call (tree-based)</h3>",
+            f"<p>Each of {st['n_queries']} tree-set sequences was placed in a maximum-likelihood "
+            f"tree of {st['n_references']} reference sequences. A call needs a clade of one "
+            f"subtype and {st['min_support']:g}% bootstrap support on the joining branch. "
+            f"Agree {c.get('agree', 0)}, disagree {c.get('disagree', 0)}, not comparable "
+            f"{c.get('not_comparable', 0)}, unresolved {c.get('unresolved', 0)}. Unresolved is "
+            "common because few references represent each subtype, so this check can confirm a "
+            "call but not rule one out.</p>",
+        ]
     cl = _read_json(results / "phylo" / "clusters_summary.json")
     if cl:
         s = cl["sdrm"]
@@ -275,7 +337,7 @@ def render(settings: Settings, root: Path) -> str:
     ):
         if not path.exists():
             raise ContractError(f"{path} not found; run `virotrace {stage}` first")
-    items = "".join(f"<li>{escape(t)}</li>" for t in limitations(root))
+    items = "".join(f"<li>{escape(t)}</li>" for t in limitations(root, settings.scope))
     scope = escape(settings.scope.capitalize())
     stamp = datetime.now(UTC).strftime("%Y-%m-%d")
     return f"""<!DOCTYPE html>

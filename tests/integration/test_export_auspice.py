@@ -139,7 +139,10 @@ def test_gene_coordinates_are_in_the_pol_alignment_frame_and_the_old_flag_is_sti
     workspace,
 ):
     settings, _ = workspace
-    rows = [line.split("\t") for line in genes_gff(settings).splitlines()[1:]]
+    text = genes_gff(settings)
+    assert "##sequence-region pol 1 3012" in text  # augur needs this to make the nuc annotation
+    rows = [line.split("\t") for line in text.splitlines() if not line.startswith("##")]
+    assert rows[0][2] == "region" and (rows[0][3], rows[0][4]) == ("1", "3012")
     spans = {r[8].split(";")[0]: (int(r[3]), int(r[4])) for r in rows if r[2] == "CDS"}
     assert spans == {"ID=PR": (169, 465), "ID=RT": (466, 2145), "ID=IN": (2146, 3009)}
     assert all((end - start + 1) % 3 == 0 for start, end in spans.values())

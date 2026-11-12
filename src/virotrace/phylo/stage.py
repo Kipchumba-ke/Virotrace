@@ -30,6 +30,14 @@ Runner = Callable[[Sequence[str]], None]
 MIN_SUBTYPE_TIPS = 30
 
 
+def _excerpt(text: str, head: int = 1500, tail: int = 800) -> str:
+    """Start and end of a tool's stderr: the cause is usually at the start, the summary at the end."""
+    text = text.strip()
+    if len(text) <= head + tail:
+        return text
+    return f"{text[:head]}\n[...]\n{text[-tail:]}"
+
+
 def subprocess_runner(command: Sequence[str]) -> None:
     try:
         process = subprocess.run(list(command), capture_output=True, text=True, check=False)
@@ -37,7 +45,7 @@ def subprocess_runner(command: Sequence[str]) -> None:
         raise ContractError(f"`{command[0]}` is not installed or not on PATH") from exc
     if process.returncode != 0:
         raise ContractError(
-            f"`{command[0]}` failed (exit {process.returncode}): {process.stderr.strip()[-800:]}"
+            f"`{command[0]}` failed (exit {process.returncode}): {_excerpt(process.stderr)}"
         )
 
 
@@ -194,6 +202,25 @@ def _gate(settings: Settings, tree, rows: list[dict[str, str]]) -> dict[str, Any
     return out
 
 
+def _check_rate_is_plausible(node_data: Path, prior: Sequence[float]) -> None:
+    """Reject a time tree whose estimated rate is far outside the prior range.
+
+    A rate several-fold below any HIV-1 pol estimate puts the root centuries back (an A1 tree
+    came out at the year 1220), so its dates would be quoted as if they meant something.
+    """
+    if not node_data.exists() or len(prior) < 2:
+        return
+    rate = (json.loads(node_data.read_text()).get("clock") or {}).get("rate")
+    if rate is None:
+        return
+    low, high = min(prior) / 5, max(prior) * 5
+    if not low <= rate <= high:
+        raise ContractError(
+            f"estimated clock rate {rate:.3g} substitutions/site/year is outside "
+            f"{low:.3g} to {high:.3g} (the configured prior range, widened five-fold)"
+        )
+
+
 def run_refine(
     settings: Settings,
     *,
@@ -240,6 +267,15 @@ def run_refine(
         "--seed", str(settings.stage_seed("refine")),
     ]  # fmt: skip
     cfg = settings.phylo.refine
+    rooted = p["phylo"] / "tree.midpoint.nwk"
+
+    def midpoint_rooted(cmd: list[str]) -> list[str]:
+        """The same command on the midpoint-rooted tree, kept as rooted."""
+        rooted.write_text(to_newick(tree, midpoint_edge(tree)) + "\n")
+        out = list(cmd)
+        out[out.index("--tree") + 1] = str(rooted)
+        return [*out, "--keep-root"]
+
     if use_time:
         command += [
             "--timetree", "--root", "best", "--coalescent", "opt",
@@ -249,13 +285,70 @@ def run_refine(
             command += ["--clock-rate", str(cfg.clock_rate)]
         if cfg.date_confidence:
             command.append("--date-confidence")
+        check = cfg.clock_rate is None
+
+        def attempt(cmd: list[str]) -> None:
+            node_data.unlink(missing_ok=True)  # never judge a rate left by an earlier run
+            runner(cmd)
+            if check:
+                _check_rate_is_plausible(node_data, cfg.clock_rate_prior)
+
+        try:
+            attempt(command)
+        except ContractError as first:
+            # TreeTime can fail while searching for the best root (e.g. "Rerooting failed")
+            # even where the gate's own regression is fine. Try the same time tree on the
+            # midpoint root; failing that, give a divergence tree. Either is said in the gate.
+            gate["refine_error"] = str(first)[:2500]
+            no_best_root = [
+                c for i, c in enumerate(command) if not (c == "best" and command[i - 1] == "--root")
+            ]
+            no_best_root.remove("--root")
+            retry = midpoint_rooted(no_best_root)
+            try:
+                attempt(retry)
+                command = retry
+                gate["root"] = "midpoint (augur's best-root search failed)"
+                gate["note"] = "time tree rooted at the midpoint: augur's best-root search failed"
+            except ContractError as second:
+                gate["refine_error_midpoint"] = str(second)[:2500]
+                # TreeTime's own rate estimate (after its clock filter) can be negative even
+                # where the gate's regression is positive; it then asks for the rate and its
+                # standard deviation. Give it the gate's regression slope, with a wide spread.
+                slope = (gate.get("pooled") or {}).get("slope")
+                if isinstance(slope, (int, float)) and slope > 0:
+                    fixed = [
+                        *retry,
+                        "--clock-rate",
+                        f"{slope:.6g}",
+                        "--clock-std-dev",
+                        f"{slope / 2:.6g}",
+                    ]
+                    if "--clock-rate" in retry:
+                        i = retry.index("--clock-rate")
+                        fixed = [c for j, c in enumerate(retry) if j not in (i, i + 1)] + fixed[
+                            len(retry) :
+                        ]
+                    try:
+                        runner(fixed)
+                        command = fixed
+                        gate["root"] = "midpoint (augur's own rate estimate failed)"
+                        gate["fixed_clock_rate"] = slope
+                        gate["note"] = (
+                            "time tree at the midpoint root with the clock rate fixed at the "
+                            "regression slope (std dev half of it): augur's own estimate failed"
+                        )
+                    except ContractError as third:
+                        gate["refine_error_fixed_rate"] = str(third)[:2500]
+                if "fixed_clock_rate" not in gate:
+                    gate["time_tree"] = False
+                    gate["note"] = "augur could not date this tree; showing a divergence tree"
+                    command = midpoint_rooted([c for c in command[: command.index("--timetree")]])
+                    runner(command)
     else:
         # no clock to root on: midpoint root, written out so augur keeps it as given
-        rooted = p["phylo"] / "tree.midpoint.nwk"
-        rooted.write_text(to_newick(tree, midpoint_edge(tree)) + "\n")
-        command[command.index("--tree") + 1] = str(rooted)
-        command.append("--keep-root")
-    runner(command)
+        command = midpoint_rooted(command)
+        runner(command)
     (p["phylo"] / "temporal_gate.json").write_text(
         json.dumps(gate, indent=2, sort_keys=True) + "\n"
     )
@@ -268,8 +361,11 @@ def run_subtype_trees(
     """One tree per configured subtype, each with its own gate (and time tree if it passes)."""
     out: dict[str, Any] = {}
     for subtype in settings.phylo.refine.subtype_trees:
-        run_tree(settings, repo_root=repo_root, runner=runner, subtype=subtype)
-        result = run_refine(settings, repo_root=repo_root, runner=runner, subtype=subtype)
+        try:
+            run_tree(settings, repo_root=repo_root, runner=runner, subtype=subtype)
+            result = run_refine(settings, repo_root=repo_root, runner=runner, subtype=subtype)
+        except ContractError as exc:
+            raise ContractError(f"subtype {subtype}: {exc}") from exc
         gate = result["temporal_gate"]
         out[subtype] = {
             "time_tree": gate["time_tree"],
@@ -326,6 +422,8 @@ def run_clock_sensitivity(
         if not base_data.exists():
             raise ContractError(f"{base_data} not found; run `virotrace {step}` first")
         base = _clock_summary(base_data)
+        if gate.get("fixed_clock_rate"):
+            base["rate_fixed"] = True  # the pipeline supplied this rate; it was not estimated
         runs = {}
         for rate in rates:
             fixed = settings.model_copy(

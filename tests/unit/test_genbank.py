@@ -186,3 +186,53 @@ def test_clone_derived_flag_is_set_for_clones_and_not_for_ordinary_isolates(gb_t
     # a flag on the definition text alone, e.g. when the qualifier is missing
     assert is_clone_derived({"definition": "HIV-1 isolate X infectious molecular clone"})
     assert not is_clone_derived({"definition": "HIV-1 isolate K1 pol gene, partial cds."})
+
+
+def test_a_query_over_the_id_cap_is_split_by_publication_year_and_loses_nothing(gb_text):
+    import re
+
+    import virotrace.acquire.genbank as gbm
+
+    per_year = {1999: 3, 2005: 2, 2012: 4}  # records per publication year; total 9
+
+    class Split(FakeEntrez):
+        def __call__(self, url, params):
+            if not url.endswith("esearch.fcgi"):
+                return super().__call__(url, params)
+            self.calls.append(("esearch.fcgi", params))
+            m = re.search(r"(\d{4})/01/01:(\d{4})/12/31", params["term"])
+            if not m:
+                return json.dumps({"esearchresult": {"idlist": ["x"] * 3, "count": "9"}})
+            lo, hi = int(m[1]), int(m[2])
+            ids = [f"{y}-{i}" for y, n in per_year.items() if lo <= y <= hi for i in range(n)]
+            return json.dumps({"esearchresult": {"idlist": ids, "count": str(len(ids))}})
+
+    original = gbm.ID_CAP
+    gbm.ID_CAP = 5
+    try:
+        adapter = _adapter(Split(gb_text))
+        ids, total = adapter._search()
+    finally:
+        gbm.ID_CAP = original
+    assert total == 9 and len(ids) == 9 and len(set(ids)) == 9
+    assert ids == sorted(ids, key=lambda i: int(i.split("-")[0]))  # joined in date order
+
+
+def test_extra_term_is_anded_on_and_changes_the_recorded_query():
+    base = build_term(country="Uganda")
+    narrowed = build_term(country="Uganda", extra=' pol[Gene] OR "reverse transcriptase"[Title] ')
+    assert narrowed == base + ' AND (pol[Gene] OR "reverse transcriptase"[Title])'
+    assert build_term(country="Uganda", extra="  ") == base
+    assert build_term(country="Uganda", extra=None) == base
+
+
+def test_an_interrupted_download_resumes_from_the_batch_cache(gb_text, tmp_path):
+    first = FakeEntrez(gb_text)
+    records = list(_adapter(first, cache_dir=tmp_path).fetch())
+    assert len(records) == 2 and [n for n, _ in first.calls].count("efetch.fcgi") == 1
+    assert len(list(tmp_path.glob("*.gb"))) == 1 and not list(tmp_path.glob("*.part"))
+
+    second = FakeEntrez(gb_text)
+    again = list(_adapter(second, cache_dir=tmp_path).fetch())
+    assert [r.accession for r in again] == [r.accession for r in records]
+    assert [n for n, _ in second.calls].count("efetch.fcgi") == 0  # served from disk

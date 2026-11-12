@@ -142,7 +142,13 @@ def genes_gff(settings: Settings) -> str:
     """
     genes = settings.reference.genes
     start = genes.pol[0]
-    lines = ["##gff-version 3"]
+    width = genes.pol[1] - start + 1
+    # augur builds its 'nuc' annotation from the pragma or a region line; without one it stops
+    lines = [
+        "##gff-version 3",
+        f"##sequence-region pol 1 {width}",
+        f"pol\tvirotrace\tregion\t1\t{width}\t.\t+\t.\tID=pol;Name=nuc",
+    ]
     for gene, (a, b) in (("PR", genes.pr), ("RT", genes.rt), ("IN", genes.in_)):
         first, last = a - start + 1, b - start + 1
         attrs = f"ID={gene};Name={gene};gene={gene};locus_tag={gene}"

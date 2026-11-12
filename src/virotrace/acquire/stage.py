@@ -41,12 +41,18 @@ def build_adapters(
                 country=countries,
                 min_length=int(acquire.get("min_length", 1000)),
                 max_length=int(acquire.get("max_length", 10000)),
+                extra=acquire.get("extra_term"),
             )
             adapters.append(
                 GenBankAdapter(
                     term,
                     retries=int(acquire.get("retries", 3)),
                     max_records=max_records,
+                    cache_dir=(
+                        Path(repo_root) / "data" / "raw" / ".fetch_cache"
+                        if acquire.get("cache", True)
+                        else None
+                    ),
                 )
             )
         elif name == "lanl":

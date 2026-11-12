@@ -103,6 +103,18 @@ def test_agreement_handles_group_labels_and_crfs():
     assert agreement("CRF01_AE", "CRF01_AE") == "agree"
     assert agreement("D", "") == "unreported"
     assert agreement(UNASSIGNED, "D") == "not_comparable"
+    # a mosaic depositor label cannot be compared with a single-subtype call
+    assert agreement("D", "AD") == "not_comparable"
+    assert agreement("A1", "A1A2D") == "not_comparable"
+    assert agreement("A1", "URF_A1D") == "not_comparable"
+    assert agreement("D", "DU") == "not_comparable"
+    assert agreement("D", "Recombinant") == "not_comparable"
+    assert agreement("C", "AD") == "disagree"  # C is not a component
+    assert agreement("A1", "CRF01_AE") == "not_comparable"  # CRF01_AE is A/E; A1 is a parent
+    assert agreement("G", "CRF02_AG") == "not_comparable"
+    assert agreement("B", "CRF02_AG") == "disagree"  # B is not a parent of CRF02_AG
+    assert agreement("G", "CRF43_02G") == "not_comparable"
+    assert agreement("C", "CRF06_cpx") == "disagree"  # "cpx" names no parents
 
 
 def test_mosaic_is_suspected_and_confirmed_with_segments(panel, config_path):

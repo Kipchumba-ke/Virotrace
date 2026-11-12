@@ -70,6 +70,7 @@ acquire:
   sources: [genbank, lanl]
   min_length: 1000
   max_length: 10000
+  extra_term: null               # extra Entrez clause ANDed on (e.g. to keep pol records)
   email: null                    # required by NCBI; set via env VIROTRACE_NCBI_EMAIL
   retries: 3
   cache: true

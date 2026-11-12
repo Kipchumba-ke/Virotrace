@@ -9,6 +9,7 @@ subsample:
 acquire:
   # Add `lanl` once the LANL downloads are in acquire.lanl_path (docs/03-data-acquisition.md).
   sources: [genbank]
+  extra_term: 'pol[Gene] OR pol[Title] OR "gag-pol"[Title] OR polyprotein[Title] OR "reverse transcriptase"[Title] OR protease[Title] OR "genomic sequence"[Title] OR "partial genome"[Title] OR "complete genome"[Title] OR "nearly complete"[Title]'
 
 phylo:
   refine:

@@ -407,3 +407,82 @@ def test_subtype_tree_stage_builds_the_alignment_calls_and_compares(workspace):
     assert rows["T3"]["subtype_tree"] == "D" and rows["T3"]["concordance"] == "agree"
     assert rows["T1"]["subtype_tree"] == "unresolved"
     assert (d / "subtype_disagreements.tsv").exists() and out["concordance"]["agree"] == 2
+
+
+def _refine_with_runner(workspace, runner):
+    settings, tmp = workspace
+    _meta(tmp, YEARS)
+    run_tree(settings, repo_root=".", runner=_fake_iqtree(_clock_tree(YEARS, odd_root=False)))
+    result = run_refine(settings, repo_root=".", runner=runner)
+    return result["temporal_gate"], result["command"]
+
+
+def test_a_failed_best_root_search_retries_the_time_tree_at_the_midpoint(workspace):
+    from virotrace.errors import ContractError
+
+    calls = []
+
+    def runner(command):
+        calls.append(list(command))
+        if "--root" in command:
+            raise ContractError("`augur` failed (exit 2): ValueError: Rerooting failed!")
+
+    gate, command = _refine_with_runner(workspace, runner)
+    assert len(calls) == 2 and "--root" not in calls[1]
+    assert (
+        "--timetree" in command and "--keep-root" in command and "tree.midpoint.nwk" in str(command)
+    )
+    assert gate["time_tree"] is True and "Rerooting failed" in gate["refine_error"]
+    assert gate["root"].startswith("midpoint")
+
+
+def test_when_augur_cannot_date_the_tree_at_all_a_divergence_tree_is_made(workspace):
+    from virotrace.errors import ContractError
+
+    calls = []
+
+    def runner(command):
+        calls.append(list(command))
+        if "--timetree" in command:
+            raise ContractError("`augur` failed (exit 2): TreeTime error")
+
+    gate, command = _refine_with_runner(workspace, runner)
+    assert len(calls) == 4 and "--timetree" not in command and "--keep-root" in command
+    assert gate["time_tree"] is False and "divergence tree" in gate["note"]
+    assert "refine_error" in gate and "refine_error_midpoint" in gate
+    assert "refine_error_fixed_rate" in gate
+
+
+def test_a_negative_rate_estimate_is_retried_with_the_clock_rate_fixed(workspace):
+    from virotrace.errors import ContractError
+
+    calls = []
+
+    def runner(command):
+        calls.append(list(command))
+        if "--timetree" in command and "--clock-std-dev" not in command:
+            raise ContractError("ValueError: rate estimate is negative")
+
+    gate, command = _refine_with_runner(workspace, runner)
+    assert len(calls) == 3 and "--clock-rate" in command and "--clock-std-dev" in command
+    assert command.count("--clock-rate") == 1 and "--keep-root" in command
+    assert gate["time_tree"] is True and gate["fixed_clock_rate"] > 0
+    assert "refine_error" in gate and "refine_error_midpoint" in gate
+
+
+def test_an_implausibly_low_estimated_rate_is_not_accepted_as_a_time_tree(workspace):
+    import json as _json
+
+    calls = []
+
+    def runner(command):
+        calls.append(list(command))
+        if "--timetree" in command:
+            rate = 0.002 if "--clock-std-dev" in command else 5e-5
+            out = command[command.index("--output-node-data") + 1]
+            Path(out).write_text(_json.dumps({"clock": {"rate": rate}, "nodes": {}}))
+
+    gate, command = _refine_with_runner(workspace, runner)
+    assert len(calls) == 3 and "--clock-std-dev" in command
+    assert gate["time_tree"] is True and gate["fixed_clock_rate"] > 0
+    assert "outside" in gate["refine_error"] and "outside" in gate["refine_error_midpoint"]

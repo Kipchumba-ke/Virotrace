@@ -89,6 +89,10 @@ def test_disagreements_are_counted_by_study_country_and_label_pair():
         "a": {"study_key": "S1", "country": "KEN"}, "b": {"study_key": "S1", "country": "KEN"},
         "c": {"study_key": "S2", "country": "KEN"}, "d": {"study_key": "S1", "country": "KEN"},
     }  # fmt: skip
-    out = disagreements_by_study(rows, meta)
-    assert [(r["study_key"], r["n"]) for r in out] == [("S1", 2), ("S2", 1)]
+    out = disagreements_by_study(rows, meta, {"a": "p1", "b": "p1", "c": "p2"})
+    assert [r["study_key"] for r in out] == [
+        "S1",
+        "S2",
+    ]  # tied on people (1 each), then by sequences
+    assert out[0]["n"] == 2 and out[0]["n_individuals"] == 1
     assert out[0]["median_support"] == 0.8 and out[0]["subtype_called"] == "C"

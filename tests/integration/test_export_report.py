@@ -142,3 +142,34 @@ def test_report_html_escapes_study_text(workspace):
     run_report(settings, repo_root=tmp)
     html = (tmp / "reports/kenya/index.html").read_text()
     assert "<script>x" not in html and "&lt;script&gt;" in html
+
+
+def test_report_shows_clock_sensitivity_and_the_tree_based_subtype_check(workspace):
+    settings, tmp = workspace
+    phylo = tmp / "results/kenya/phylo"
+    (phylo / "A1/clock_sensitivity.json").write_text(
+        json.dumps({
+            "estimated": {"clock_rate": 0.00054, "root_date": 1970.13},
+            "fixed": {"0.0008": {"root_date": 1979.38, "root_shift_years": 9.25}},
+        })
+    )  # fmt: skip
+    (phylo / "subtype_tree").mkdir()
+    (phylo / "subtype_tree/subtype_tree_summary.json").write_text(
+        json.dumps({"n_queries": 60, "n_references": 55, "min_support": 95.0,
+                    "concordance": {"agree": 5, "unresolved": 50, "not_comparable": 5}})
+    )  # fmt: skip
+    run_report(settings, repo_root=tmp)
+    html = (tmp / "reports/kenya/index.html").read_text()
+    assert "Clock-rate sensitivity" in html and "+9.2" in html and "1979.38" in html
+    assert "Second subtype call" in html and "Unresolved is common" in html
+    assert "unresolved 50" in html
+
+
+def test_limitations_name_the_scope_of_the_build(tmp_path):
+    import shutil
+
+    shutil.copytree("docs", tmp_path / "docs")
+    africa = limitations(tmp_path, "africa")
+    assert any("the Africa epidemic" in i for i in africa)
+    assert not any("Kenya" in i and "epidemic" in i for i in africa)
+    assert any("the Kenyan epidemic" in i for i in limitations(tmp_path, "kenya"))

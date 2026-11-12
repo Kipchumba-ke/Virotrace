@@ -43,6 +43,31 @@ def test_snapshots_are_immutable(tmp_path, records_toy_tsv):
         _snapshot(tmp_path, records_toy_tsv)
 
 
+class _Failing:
+    name = "failing"
+    access_tier = "open"
+
+    def query_description(self):
+        return "failing-query"
+
+    def fetch(self):
+        raise ContractError("NCBI requires a contact email")
+        yield  # pragma: no cover
+
+
+def test_a_failed_fetch_leaves_nothing_behind_so_the_retry_works(tmp_path, records_toy_tsv):
+    with pytest.raises(ContractError, match="contact email"):
+        take_snapshot([_Failing()], tmp_path, date="2026-11-05")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_an_empty_leftover_folder_does_not_block_a_new_snapshot(tmp_path, records_toy_tsv):
+    leftover = tmp_path / make_snapshot_id("2026-11-05", ["fixture:records_toy.tsv"])
+    leftover.mkdir()
+    snap = _snapshot(tmp_path, records_toy_tsv)
+    assert snap == leftover and (snap / "manifest.json").exists()
+
+
 def test_snapshot_id_is_stable_and_order_independent():
     a = make_snapshot_id("2026-11-05", ["q1", "q2"])
     assert a == make_snapshot_id("2026-11-05", ["q2", "q1"])

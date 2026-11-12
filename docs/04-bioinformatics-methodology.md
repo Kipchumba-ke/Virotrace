@@ -210,7 +210,7 @@ comparison should happen before publishing, not after a reviewer asks.
 2. Pretreatment vs. acquired resistance cannot be separated; treatment status is unknown for most records.
 3. Geographic resolution is country-level for most records; subnational inference is limited or absent.
 4. HIVdb interpretation is best validated on subtype B; Kenya's epidemic is predominantly non-B.
-5. Recombinants are excluded from the tree, so the phylogeny represents the non-recombinant subset.
+5. Confirmed recombinants (by the distance screen, per the recombination tree policy) are excluded from the tree. Suspected recombinants and sequences with no subtype call stay in, so the phylogeny is not strictly the non-recombinant subset.
 6. Migration reconstruction is confounded by uneven sampling intensity across countries and years.
 7. Temporal trends may reflect changing study composition rather than epidemic change.
 8. Not a clinical tool; no result should inform individual patient management.
