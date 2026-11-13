@@ -119,7 +119,8 @@ def test_limitations_come_from_the_methods_doc_and_are_all_in_the_report(workspa
     run_report(settings, repo_root=tmp)
     html = (tmp / "reports/kenya/index.html").read_text()
     assert all(item.split(" ")[0] in html for item in items)
-    assert html.count("<li>") == len(items)
+    limits = html.split("<h2>Limitations</h2>")[1].split("<h2>References</h2>")[0]
+    assert limits.count("<li>") == len(items)
 
 
 def test_report_without_phylo_outputs_says_so_and_missing_prevalence_names_the_stage(workspace):
@@ -173,3 +174,32 @@ def test_limitations_name_the_scope_of_the_build(tmp_path):
     assert any("the Africa epidemic" in i for i in africa)
     assert not any("Kenya" in i and "epidemic" in i for i in africa)
     assert any("the Kenyan epidemic" in i for i in limitations(tmp_path, "kenya"))
+
+
+def test_underflowed_p_values_are_shown_as_a_bound_not_zero():
+    from virotrace.export.report import _p_text
+
+    assert _p_text("0") == "< 1e-300" and _p_text("8.07e-182") == "8.07e-182"
+
+
+def test_a_root_older_than_hiv_is_marked_not_plausible():
+    from virotrace.export.report import _root_text
+
+    assert "not plausible" in _root_text(1711.39) and _root_text(1962.21) == "1962.21"
+
+
+def test_the_pooled_row_names_the_country_that_dominates_it():
+    from virotrace.export.report import _pooled_note
+
+    rows = [
+        {"stratum_kind": "country", "drug_class": "NRTI", "stratum": "A", "denominator": "30"},
+        {"stratum_kind": "country", "drug_class": "NRTI", "stratum": "B", "denominator": "70"},
+    ]
+    note = _pooled_note(rows, ["NRTI"])
+    assert "B alone is 70%" in note and _pooled_note(rows[:1], ["NRTI"]) == ""
+
+
+def test_the_report_ends_with_references_before_provenance(tmp_path):
+    from virotrace.export.report import REFERENCES
+
+    assert any("PLoS ONE" in r for r in REFERENCES) and len(REFERENCES) >= 8

@@ -48,8 +48,23 @@ guard `data/` from being committed at all.
 `acquire.extra_term` adds an Entrez clause (ANDed, so it can only remove records) to the query,
 for example a clause that keeps records naming pol. Compare counts on the NCBI nuccore website
 with and without the clause before trusting it, and check a trial's QC funnel: a clause that is
-too tight silently drops pol records. A query over 100,000 ids is split by publication year
-automatically.
+too tight silently drops pol records. A query over 100,000 ids is split by publication date
+automatically, and the joined id count is checked against the total NCBI reports.
+
+The clause used for the Africa build is:
+
+```yaml
+acquire:
+  extra_term: >-
+    pol[Gene] OR pol[Title] OR "gag-pol"[Title] OR polyprotein[Title]
+    OR "reverse transcriptase"[Title] OR protease[Title] OR "genomic sequence"[Title]
+    OR "partial genome"[Title] OR "complete genome"[Title] OR "nearly complete"[Title]
+```
+
+It cuts the Africa matches from 187,662 to 113,993. Checked against records that pass QC, it
+kept 100% of the Kenya corpus and 99.6% of a 5,000-record Africa trial (an earlier, narrower
+clause kept only 88.8% of Kenya: it missed titles such as "UNVERIFIED: ... genomic sequence"
+and "gag-pol polyprotein"). Re-run that check before changing it.
 
 **Running the LANL source.** LANL has no query API, so the adapter reads files you download:
 at hiv.lanl.gov run the Sequence Search (HIV-1, pol region, the countries of your scope), download

@@ -23,6 +23,31 @@ from ..settings import Settings
 METHODS_DOC = Path("docs/04-bioinformatics-methodology.md")
 NOT_RUN = "Not generated for this build."
 
+REFERENCES = [
+    "Bennett DE, et al. Drug resistance mutations for surveillance of transmitted HIV-1 drug "
+    "resistance: 2009 update. PLoS ONE 2009;4(3):e4724. (Headline surveillance list.)",
+    "Stanford University HIV Drug Resistance Database (HIVdb): the current surveillance "
+    "mutation list and algorithm, used as the sensitivity list at the version shown above.",
+    "Katoh K, Standley DM. MAFFT multiple sequence alignment software version 7. "
+    "Mol Biol Evol 2013;30:772-780.",
+    "Minh BQ, et al. IQ-TREE 2: new models and efficient methods for phylogenetic inference "
+    "in the genomic era. Mol Biol Evol 2020;37:1530-1534.",
+    "Tamura K, Nei M. Estimation of the number of nucleotide substitutions in the control "
+    "region of mitochondrial DNA in humans and chimpanzees. Mol Biol Evol 1993;10:512-526. "
+    "(TN93 distance.)",
+    "Sagulenko P, Puller V, Neher RA. TreeTime: maximum-likelihood phylodynamic analysis. "
+    "Virus Evol 2018;4:vex042.",
+    "Hadfield J, et al. Nextstrain: real-time tracking of pathogen evolution. "
+    "Bioinformatics 2018;34:4121-4123. (Augur and Auspice.)",
+    "Wilson EB. Probable inference, the law of succession, and statistical inference. "
+    "J Am Stat Assoc 1927;22:209-212. (Confidence intervals.)",
+    "Mantel N, Haenszel W. Statistical aspects of the analysis of data from retrospective "
+    "studies of disease. J Natl Cancer Inst 1959;22:719-748.",
+    "Sayers EW, et al. Database resources of the National Center for Biotechnology "
+    "Information. Nucleic Acids Res (annual issue). (GenBank, via Entrez; the exact queries "
+    "are in the snapshot manifests.)",
+]
+
 EXTRA_LIMITATIONS = [
     "Country is the GenBank country qualifier. Multi-site trial cohorts (for example the RV217 "
     "and HVTN 703 isolates) may carry a single country tag for participants enrolled elsewhere; "
@@ -149,6 +174,8 @@ def _prevalence_sections(results: Path) -> str:
                 table_rows.append([stratum, *cells])
             label = "Overall" if kind == "overall" else f"By {kind.replace('_', ' ')}"
             out.append(f"<h4>{escape(label)}</h4>" + _table(["Stratum", *classes], table_rows))
+            if role == "headline" and kind == "overall":
+                out.append(_pooled_note(sub, classes))
     trends = read_tsv(results / "drm" / "trend_tests.tsv")
     if trends:
         out.append("<h3>Trend tests (headline list)</h3>")
@@ -162,7 +189,7 @@ def _prevalence_sections(results: Path) -> str:
                         t["first_bin"],
                         t["last_bin"],
                         t["z"],
-                        t["p_two_sided"],
+                        _p_text(t["p_two_sided"]),
                         t["note"],
                     ]
                     for t in trends
@@ -201,11 +228,18 @@ def _data_section(results: Path) -> str:
         )
         after = qc.get("corpus_after_qc_and_clone_policy", {})
         if after:
-            out.append(
-                f"<p>After the policies: {after.get('n_total')} individuals, "
-                f"{after.get('n_time_tree_eligible_strict')} with day or month collection dates "
-                f"({after.get('n_time_tree_eligible_with_year_only')} counting year-only).</p>"
-            )
+            strict = after.get("all_n_time_tree_eligible_strict")
+            if strict is not None:
+                dated = (
+                    f"{strict} with day or month collection dates "
+                    f"({after.get('all_n_time_tree_eligible_with_year_only')} counting year-only)"
+                )
+            else:  # a summary written before the whole-corpus counts existed
+                dated = (
+                    f"{after.get('n_time_tree_eligible_strict')} with day or month collection "
+                    "dates in the target country only"
+                )
+            out.append(f"<p>After the policies: {after.get('n_total')} individuals, {dated}.</p>")
     if sub:
         out.append("<h3>Tree set</h3>")
         out.append(
@@ -217,6 +251,42 @@ def _data_section(results: Path) -> str:
             _table(["Year", "n"], [[k, v] for k, v in sorted(sub.get("by_year", {}).items())])
         )
     return "\n".join(out) or f"<p>{NOT_RUN}</p>"
+
+
+def _p_text(value: Any) -> str:
+    """A p-value that underflowed to zero is shown as a bound, never as 0."""
+    try:
+        return "< 1e-300" if float(value) == 0.0 else str(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _pooled_note(rows: list[dict[str, Any]], classes: list[str]) -> str:
+    """Say which country dominates the pooled row, so it is not read as a continental estimate."""
+    sizes: dict[str, int] = {}
+    for r in rows:
+        if r["stratum_kind"] == "country" and r["drug_class"] == classes[0]:
+            try:
+                sizes[r["stratum"]] = int(r["denominator"])
+            except (TypeError, ValueError):
+                continue
+    total = sum(sizes.values())
+    if len(sizes) < 2 or not total:
+        return ""
+    name, n = max(sizes.items(), key=lambda kv: kv[1])
+    return (
+        f"<p>This row pools every country by sequence count, so {escape(name)} alone is "
+        f"{n / total:.0%} of it. It is not an estimate for the region.</p>"
+    )
+
+
+def _root_text(root: Any) -> str:
+    """A root before 1900 is older than HIV-1 group M: say so instead of printing it as a date."""
+    try:
+        year = float(root)
+    except (TypeError, ValueError):
+        return str(root)
+    return f"{root} (before 1900: not plausible)" if year < 1900 else str(root)
 
 
 def _gate_row(label: str, gate: dict[str, Any], time_tree: bool, root: str = "") -> list[Any]:
@@ -263,13 +333,19 @@ def _phylo_section(results: Path, subtypes: list[str]) -> str:
                 sub_label,
                 "fixed by the pipeline" if est.get("rate_fixed") else "estimated",
                 f"{est['clock_rate']:.5f}",
-                est["root_date"],
+                _root_text(est["root_date"]),
                 "",
             ]
         )
         for rate, run in sorted(cs["fixed"].items(), key=lambda kv: float(kv[0])):
             clock_rows.append(
-                [sub_label, "fixed", rate, run["root_date"], f"{run['root_shift_years']:+.1f}"]
+                [
+                    sub_label,
+                    "fixed",
+                    rate,
+                    _root_text(run["root_date"]),
+                    f"{run['root_shift_years']:+.1f}",
+                ]
             )
     if clock_rows:
         out += [
@@ -278,7 +354,8 @@ def _phylo_section(results: Path, subtypes: list[str]) -> str:
                 ["Tree", "Rate", "Substitutions/site/year", "Root date", "Shift (years)"],
                 clock_rows,
             ),
-            "<p>Root dates move with the assumed rate. Quote a timeline as a range across these "
+            "<p>Root dates move with the assumed rate; a root marked not plausible means that rate "
+            "does not fit the tree. Quote a timeline as a range across these "
             "rates, not as the point estimate.</p>",
         ]
     st = _read_json(results / "phylo" / "subtype_tree" / "subtype_tree_summary.json")
@@ -338,6 +415,7 @@ def render(settings: Settings, root: Path) -> str:
         if not path.exists():
             raise ContractError(f"{path} not found; run `virotrace {stage}` first")
     items = "".join(f"<li>{escape(t)}</li>" for t in limitations(root, settings.scope))
+    refs = "".join(f"<li>{escape(t)}</li>" for t in REFERENCES)
     scope = escape(settings.scope.capitalize())
     stamp = datetime.now(UTC).strftime("%Y-%m-%d")
     return f"""<!DOCTYPE html>
@@ -365,6 +443,8 @@ limitations before quoting a number.</p>
 {_phylo_section(results, settings.phylo.refine.subtype_trees)}
 <h2>Limitations</h2>
 <ol>{items}</ol>
+<h2>References</h2>
+<ol>{refs}</ol>
 <h2>Provenance</h2>
 <p>Scope <code>{scope.lower()}</code>. The fully resolved configuration is in
 <code>results/{escape(settings.scope)}/resolved_config.yaml</code> and snapshot manifests list the

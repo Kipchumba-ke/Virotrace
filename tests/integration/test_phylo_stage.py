@@ -486,3 +486,24 @@ def test_an_implausibly_low_estimated_rate_is_not_accepted_as_a_time_tree(worksp
     assert len(calls) == 3 and "--clock-std-dev" in command
     assert gate["time_tree"] is True and gate["fixed_clock_rate"] > 0
     assert "outside" in gate["refine_error"] and "outside" in gate["refine_error_midpoint"]
+
+
+def test_a_root_older_than_group_m_is_not_accepted_even_with_a_plausible_rate(workspace):
+    import json as _json
+    from pathlib import Path
+
+    calls = []
+
+    def runner(command):
+        calls.append(list(command))
+        if "--timetree" in command:
+            fixed = "--clock-std-dev" in command
+            out = command[command.index("--output-node-data") + 1]
+            root = 1990.0 if fixed else 1712.0
+            Path(out).write_text(
+                _json.dumps({"clock": {"rate": 0.0008}, "nodes": {"a": {"numdate": root}}})
+            )
+
+    gate, command = _refine_with_runner(workspace, runner)
+    assert "--clock-std-dev" in command and gate["time_tree"] is True
+    assert "1712" in gate["refine_error"]

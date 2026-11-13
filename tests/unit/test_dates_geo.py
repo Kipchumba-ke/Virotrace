@@ -89,3 +89,16 @@ def test_corpus_reports_strict_dated_tips_by_year():
         ]
     ]
     assert count_corpus(rows)["strict_dated_by_year"] == {"2010": 2, "2012": 1}
+
+
+def test_corpus_counts_dated_rows_over_the_whole_corpus_as_well_as_the_target_country():
+    from virotrace.curate.corpus import count_corpus
+
+    rows = [
+        {"country_code": c, "date_precision": p, "year": 2010, "region": "x"}
+        for c, p in (("KEN", "day"), ("UGA", "day"), ("UGA", "month"), ("UGA", "year"))
+    ]
+    out = count_corpus(rows)
+    assert out["n_time_tree_eligible_strict"] == 1
+    assert out["all_n_time_tree_eligible_strict"] == 3
+    assert out["all_n_time_tree_eligible_with_year_only"] == 4

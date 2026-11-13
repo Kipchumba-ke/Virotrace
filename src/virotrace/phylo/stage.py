@@ -202,22 +202,32 @@ def _gate(settings: Settings, tree, rows: list[dict[str, str]]) -> dict[str, Any
     return out
 
 
+MIN_PLAUSIBLE_ROOT_YEAR = 1900  # published group M origin estimates are the 1900s to 1930s
+
+
 def _check_rate_is_plausible(node_data: Path, prior: Sequence[float]) -> None:
-    """Reject a time tree whose estimated rate is far outside the prior range.
+    """Reject a time tree whose rate or root date cannot be right.
 
     A rate several-fold below any HIV-1 pol estimate puts the root centuries back (an A1 tree
-    came out at the year 1220), so its dates would be quoted as if they meant something.
+    came out at the year 1220), and a rate just inside the prior can still do it (A1 at the year
+    1712, G at 1859), so the root date is checked as well: nothing here can be older than group M.
     """
     if not node_data.exists() or len(prior) < 2:
         return
-    rate = (json.loads(node_data.read_text()).get("clock") or {}).get("rate")
-    if rate is None:
-        return
-    low, high = min(prior) / 5, max(prior) * 5
-    if not low <= rate <= high:
+    data = json.loads(node_data.read_text())
+    rate = (data.get("clock") or {}).get("rate")
+    if rate is not None:
+        low, high = min(prior) / 5, max(prior) * 5
+        if not low <= rate <= high:
+            raise ContractError(
+                f"estimated clock rate {rate:.3g} substitutions/site/year is outside "
+                f"{low:.3g} to {high:.3g} (the configured prior range, widened five-fold)"
+            )
+    dates = [n["numdate"] for n in data.get("nodes", {}).values() if "numdate" in n]
+    if dates and min(dates) < MIN_PLAUSIBLE_ROOT_YEAR:
         raise ContractError(
-            f"estimated clock rate {rate:.3g} substitutions/site/year is outside "
-            f"{low:.3g} to {high:.3g} (the configured prior range, widened five-fold)"
+            f"the estimated root date {min(dates):.0f} is before {MIN_PLAUSIBLE_ROOT_YEAR}, "
+            "older than HIV-1 group M can be"
         )
 
 
@@ -308,7 +318,7 @@ def run_refine(
             try:
                 attempt(retry)
                 command = retry
-                gate["root"] = "midpoint (augur's best-root search failed)"
+                gate["root"] = "midpoint root; augur's best-root search failed"
                 gate["note"] = "time tree rooted at the midpoint: augur's best-root search failed"
             except ContractError as second:
                 gate["refine_error_midpoint"] = str(second)[:2500]
@@ -332,7 +342,9 @@ def run_refine(
                     try:
                         runner(fixed)
                         command = fixed
-                        gate["root"] = "midpoint (augur's own rate estimate failed)"
+                        gate["root"] = (
+                            "midpoint root; augur's own rate estimate failed or was implausible"
+                        )
                         gate["fixed_clock_rate"] = slope
                         gate["note"] = (
                             "time tree at the midpoint root with the clock rate fixed at the "

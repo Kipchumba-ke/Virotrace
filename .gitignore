@@ -125,3 +125,6 @@ desktop.ini
 # data/raw/**/manifest.json   the queries that rebuild a snapshot
 
 unmbox.py
+# local run helpers and logs
+run_*.sh
+*.log

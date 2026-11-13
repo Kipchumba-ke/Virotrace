@@ -214,6 +214,8 @@ def run_export(
             raise ContractError(f"{aln} not found; run `virotrace subsample` first")
         gate = json.loads((folder / "temporal_gate.json").read_text())
         kind = "time tree" if gate.get("time_tree") else "divergence tree (midpoint-rooted)"
+        if gate.get("time_tree") and gate.get("fixed_clock_rate"):
+            kind += ", clock rate fixed from the root-to-tip slope"
         scope = settings.scope.capitalize()
         title = f"Virotrace: {scope} HIV-1 pol, " + (
             f"subtype {subtype}, {kind}" if subtype else f"all subtypes, {kind}"

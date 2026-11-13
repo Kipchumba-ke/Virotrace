@@ -90,27 +90,59 @@ virotrace mask      --profile kenya      # L2 gap-masked alignment for the tree 
 virotrace subsample --profile kenya      # L2 tree set: strictly dated, one per individual
 virotrace phylo tree     --profile kenya # L3b IQ-TREE
 virotrace phylo refine   --profile kenya # L3b temporal gate, then time tree or divergence tree
-virotrace phylo subtrees --profile kenya # L3b per-subtype trees and gates (A1, D)
+virotrace phylo subtrees --profile kenya # L3b per-subtype trees and gates (Kenya: A1, D)
 virotrace phylo clusters --profile kenya # L3b TN93 clusters (descriptive only)
+virotrace phylo clock-sensitivity --profile kenya  # L3b root dates under fixed clock rates
+virotrace phylo subtype-tree --profile kenya       # optional: tree-based second subtype call
 virotrace export auspice --profile kenya # L4 Auspice datasets in auspice/
 virotrace export report  --profile kenya # L4 HTML report in reports/<scope>/index.html
 auspice view --datasetDir auspice
 ```
 
 Implemented: acquisition (GenBank), normalisation, QC, alignment, DRM calling and prevalence,
-person identification across studies, subtype placement, a recombination screen, masking,
-subsampling, tree inference, the temporal-signal gate with date randomisation, per-subtype
-dated trees, clusters, the Auspice export, and the HTML report with its limitations section.
+person identification across studies, subtype placement (distance-based, plus an optional
+tree-based second call), a recombination screen, masking, subsampling, tree inference, the
+temporal-signal gate with date randomisation, per-subtype dated trees, clock-rate sensitivity,
+clusters, the Auspice export, and the HTML report with its limitations and references.
+Both the Kenya and the Africa builds have run end to end on real data.
 Not yet: ancestral trait reconstruction (`phylo traits`, off in the DAG until it exists), the
-LANL adapter, the Africa-scope build, and amino-acid mutation tracks in the export.
+LANL adapter, and amino-acid mutation tracks in the export.
+
+### The Africa build
+
+```bash
+# VIROTRACE_NCBI_EMAIL (required) and VIROTRACE_NCBI_API_KEY go in .env
+virotrace acquire --profile africa     # about 114,000 records; resumable (fetch cache)
+virotrace normalise --profile africa   # then the same stages as above, in the same order
+```
+
+The Africa query is narrowed to records that look like *pol* (`acquire.extra_term` in
+`config/profiles/africa.yaml`; the clause and its recall check are in
+[docs/03](docs/03-data-acquisition.md#3-sources-and-how-each-is-queried)), because the unnarrowed query matches about 187,000 records,
+most of them not *pol*. Entrez returns at most 100,000 ids per query, so the search is split
+by publication date and checked against the total NCBI reports. Each build keeps its own
+snapshot (`data/raw/<scope>.current`), so the Kenya and Africa corpora never mix.
+
+The Africa build of November 2026 held 88,882 QC-passed sequences, 40,217 individuals after
+the clone and individual policies, and a 4,577-individual tree set (capped at 25 per country,
+two-year bin and subtype). Subtype trees are built for A1, C, D and G.
 
 What the current results say, and do not say:
 
 - **Clusters** are a descriptive statistic at a 1.5% TN93 threshold, not transmission chains.
   SDRM prevalence is higher inside clusters than outside, but the difference disappears after
   stratifying by study treatment context; it reflects which cohorts are densely sampled.
-- **Pooled trees do not have usable temporal signal**; per-subtype trees (A1, D) do, with low
-  estimated rates, so dated trees give rough timelines only.
+- **Pooled trees do not have usable temporal signal**; per-subtype trees do, but weakly
+  (root-to-tip R-squared 0.13 to 0.46). Where TreeTime cannot estimate a sensible clock (it
+  fails outright, or returns a rate or a root date no HIV-1 could have), the pipeline retries
+  at the midpoint root with the rate fixed at the gate's regression slope, and says so in the
+  report and in the Auspice title. In the Africa build all four dated trees are of that kind.
+  Their root dates mostly reflect the sampling window: use them for relative timing, and quote
+  a range across the clock-sensitivity table, never a point estimate. Subtype A1 fits no
+  plausible rate across the prior range.
+- **Pooled prevalence is not a regional estimate.** In the Africa build South Africa is about
+  40% of the pooled sequences, treatment context is annotated for only about 15% of
+  individuals, and several countries' figures come from single treatment-failure cohorts.
 - **Subtyping and recombination are screens**, not RDP or 3SEQ. The point-mutation caller does
   not detect the T69 insertions or the K70 deletion.
 - **Individual identification** relies on isolate-name patterns in

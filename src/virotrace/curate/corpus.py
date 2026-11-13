@@ -17,6 +17,7 @@ def count_corpus(rows: Iterable[Mapping[str, Any]], *, country_code: str = "KEN"
     rows = list(rows)
     target = [r for r in rows if r["country_code"] == country_code]
     precision = Counter(r["date_precision"] for r in target)
+    everywhere = Counter(r["date_precision"] for r in rows)
     years = sorted({r["year"] for r in target if r["year"] is not None})
     return {
         "n_total": len(rows),
@@ -25,6 +26,11 @@ def count_corpus(rows: Iterable[Mapping[str, Any]], *, country_code: str = "KEN"
         "n_time_tree_eligible_strict": precision.get("day", 0) + precision.get("month", 0),
         "n_time_tree_eligible_with_year_only": (
             precision.get("day", 0) + precision.get("month", 0) + precision.get("year", 0)
+        ),
+        # the same two counts over the whole corpus, for a scope wider than the target country
+        "all_n_time_tree_eligible_strict": everywhere.get("day", 0) + everywhere.get("month", 0),
+        "all_n_time_tree_eligible_with_year_only": (
+            everywhere.get("day", 0) + everywhere.get("month", 0) + everywhere.get("year", 0)
         ),
         # Where the tree's dated tips actually sit: a clock needs spread, not just a count.
         "strict_dated_by_year": {
