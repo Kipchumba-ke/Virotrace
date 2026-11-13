@@ -34,7 +34,8 @@ def masked_columns(sequences: list[str], max_missing_frac: float) -> np.ndarray:
     if len(width) != 1:
         raise ContractError(f"alignment rows have different lengths: {sorted(width)}")
     matrix = np.stack([np.frombuffer(s.encode("ascii"), dtype=np.uint8) for s in sequences])
-    return _MISSING[matrix].mean(axis=0) > max_missing_frac
+    result: np.ndarray = _MISSING[matrix].mean(axis=0) > max_missing_frac
+    return result
 
 
 def _ranges(keep: np.ndarray) -> list[list[int]]:
