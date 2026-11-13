@@ -145,7 +145,8 @@ def _label_distances(num: np.ndarray, den: np.ndarray, panel: Panel, min_sites: 
     """Per-label minimum distance; panel members with too few shared sites are ignored."""
     with np.errstate(divide="ignore", invalid="ignore"):
         dist = np.where(den >= min_sites, num / np.maximum(den, 1), np.inf)
-    return np.minimum.reduceat(dist, panel.starts, axis=-1)
+    reduced: np.ndarray = np.minimum.reduceat(dist, panel.starts, axis=-1)
+    return reduced
 
 
 def place(
@@ -458,7 +459,8 @@ def run_subtype(
             rng=rng,
         )
         called = UNASSIGNED if placed is None or placed.support < cfg.min_support else placed.label
-        crf_label, crf_support = "", ""
+        crf_label = ""
+        crf_support: float | str = ""
         if cfg.annotate_crfs and placed is not None:
             with_crfs = place(
                 encode(sequence),

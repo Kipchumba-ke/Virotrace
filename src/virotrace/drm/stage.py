@@ -82,7 +82,11 @@ def run_drm_call(settings: Settings, *, repo_root: Path | str = ".") -> dict[str
     scope = settings.scope
     genes_cfg = settings.reference.genes
     pol_start = genes_cfg.pol[0]
-    spans = {"PR": tuple(genes_cfg.pr), "RT": tuple(genes_cfg.rt), "IN": tuple(genes_cfg.in_)}
+    spans: dict[str, tuple[int, int]] = {
+        "PR": genes_cfg.pr,
+        "RT": genes_cfg.rt,
+        "IN": genes_cfg.in_,
+    }
 
     interim = root / settings.paths["interim"] / scope
     aln_path, ins_path = interim / "aln.pol.unmasked.fasta", interim / "insertions.tsv"
@@ -124,11 +128,11 @@ def run_drm_call(settings: Settings, *, repo_root: Path | str = ".") -> dict[str
     coverage_rows: list[dict[str, Any]] = []
     table_rows: list[dict[str, Any]] = []
     deciles: dict[str, Counter[int]] = {gene: Counter() for gene in spans}
-    meeting = Counter()
-    n_frameshift = Counter()
-    n_stop = Counter()
+    meeting: Counter[str] = Counter()
+    n_frameshift: Counter[str] = Counter()
+    n_stop: Counter[str] = Counter()
     identity_deciles: dict[str, Counter[int]] = {gene: Counter() for gene in spans}
-    covering_all = Counter()
+    covering_all: Counter[str] = Counter()
     n_sequences = n_no_pol = 0
 
     for strain, projected in read_fasta(interim / "aln.pol.unmasked.fasta"):

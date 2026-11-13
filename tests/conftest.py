@@ -16,6 +16,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.fixture(autouse=True)
+def _no_ncbi_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never see a real NCBI email or API key from the developer's shell."""
+    monkeypatch.delenv("VIROTRACE_NCBI_EMAIL", raising=False)
+    monkeypatch.delenv("VIROTRACE_NCBI_API_KEY", raising=False)
+
+
 @pytest.fixture(scope="session")
 def repo_root() -> Path:
     return REPO_ROOT

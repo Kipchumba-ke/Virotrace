@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.12
+  - python=3.11
   # orchestration
   - snakemake-minimal>=8.0
   # bioinformatics -- not reliably pip-installable, which is why conda
@@ -29,6 +29,7 @@ dependencies:
   - hypothesis>=6.100
   - ruff>=0.5
   - mypy>=1.10
+  - types-pyyaml
   - jsonschema>=4.22
   - pre-commit>=3.7
   - pip

@@ -75,7 +75,8 @@ def default_transport(url: str, params: dict[str, str]) -> str:
     full = f"{url}?{urllib.parse.urlencode(params)}"
     request = urllib.request.Request(full, headers={"User-Agent": "virotrace/0.1"})
     with urllib.request.urlopen(request, timeout=60) as response:
-        return response.read().decode("utf-8", errors="replace")
+        text: str = response.read().decode("utf-8", errors="replace")
+        return text
 
 
 class GenBankAdapter:

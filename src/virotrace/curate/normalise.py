@@ -114,10 +114,6 @@ def normalise_record(
         "treatment_status": treatment_from_text(record.fields),
         "study_key": study_key(record.fields),
         "study_title": (record.fields.get("study_title", "") or "")[:200] or None,
-        "subtype_reported": record.fields.get("subtype", "") or None,
-        "ambiguity_frac": round(ambiguity_fraction(record.sequence), 6),
-        # Never inferred from mutations: that would be circular.
-        "treatment_status": "unknown",
         "qc_status": "pass",
         "qc_reason": None,
         "snapshot_id": snapshot_id,
@@ -206,8 +202,4 @@ def normalise_records(
         )
         error.quarantine = quarantine  # type: ignore[attr-defined]
         raise error
-        raise ContractError(
-            f"{len(quarantine)}/{len(records)} records quarantined, above "
-            f"max_record_error_rate={max_record_error_rate}; refusing to continue"
-        )
     return result

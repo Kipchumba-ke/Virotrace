@@ -196,7 +196,10 @@ def permutation_p(
         shuffled = y.copy()
         shuffled[idx] = rng.permutation(y[idx])
         used, d = best_root_to_tip(
-            tree, shuffled, subset=keep, require_positive_slope=require_positive_slope
+            tree,
+            shuffled.tolist(),
+            subset=keep.tolist(),
+            require_positive_slope=require_positive_slope,
         )
         if linear_regression(used, d)[2] >= observed_r2:
             hits += 1

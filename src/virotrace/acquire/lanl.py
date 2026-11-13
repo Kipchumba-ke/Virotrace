@@ -103,7 +103,8 @@ class LanlAdapter:
 
     def fetch(self) -> Iterator[RawRecord]:
         for path in self._files():
-            header, chunks = None, []
+            header: str | None = None
+            chunks: list[str] = []
             for line in [*path.read_text().splitlines(), ">"]:
                 if line.startswith(">"):
                     if header is not None:

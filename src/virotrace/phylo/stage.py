@@ -23,7 +23,7 @@ from ..errors import ContractError
 from ..io.fasta import read_fasta, write_fasta
 from ..io.tables import read_tsv, write_tsv
 from ..settings import Settings
-from .newick import midpoint_edge, parse_newick, to_newick
+from .newick import Tree, midpoint_edge, parse_newick, to_newick
 from .temporal import best_root_to_tip, decimal_year, evaluate_gate, permutation_p
 
 Runner = Callable[[Sequence[str]], None]
@@ -140,7 +140,7 @@ def augur_date(date: str, precision: str) -> str:
     return "?"
 
 
-def _gate(settings: Settings, tree, rows: list[dict[str, str]]) -> dict[str, Any]:
+def _gate(settings: Settings, tree: Tree, rows: list[dict[str, str]]) -> dict[str, Any]:
     by_strain = {r["strain"]: r for r in rows}
     missing = [n for n in (tree.name[t] for t in tree.tips) if n not in by_strain]
     if missing:
@@ -485,7 +485,10 @@ def run_subtype_tree(
     if len(panel_rows) < 4:
         raise ContractError("the pure-subtype panel has too few references to build a tree")
     width = len(query[0][1])
-    safe = lambda n: "ref_" + re.sub(r"[^A-Za-z0-9_.\-]", "_", n)  # noqa: E731
+
+    def safe(n: str) -> str:
+        return "ref_" + re.sub(r"[^A-Za-z0-9_.\-]", "_", n)
+
     labelled: dict[str, str] = {}
     rows: list[tuple[str, str]] = []
     for name, seq in panel_rows:

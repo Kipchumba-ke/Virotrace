@@ -1,0 +1,85 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "37 4 * * 1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+
+  type:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: mypy
+
+  test:
+    # No network in this job: the fixture source adapter is the only acquisition path.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: pytest tests/unit tests/contract tests/integration --cov=virotrace --cov-report=term-missing
+
+  immutable-raw:
+    # "data/raw is an immutable snapshot" is only true if nothing writes to it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No rule other than acquire may output into data/raw
+        run: |
+          set -euo pipefail
+          offenders=$(grep -rln "data/raw\|PATHS\['raw'\]" workflow/rules \
+            | grep -v "acquire.smk" || true)
+          if [ -n "$offenders" ]; then
+            echo "rules writing into data/raw: $offenders"; exit 1
+          fi
+
+  dag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]" "snakemake-minimal>=8.0"
+      - run: virotrace validate config --config config/config.yaml --profile dev
+      - run: virotrace validate config --config config/config.yaml --profile kenya
+      - run: virotrace validate config --config config/config.yaml --profile africa
+      - run: snakemake -s workflow/Snakefile --configfile config/config.yaml --dry-run --cores 1
+
+  smoke:
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: environment.yml
+          activate-environment: virotrace
+          miniforge-version: latest
+      - name: Full dev-profile build
+        shell: bash -el {0}
+        run: pytest -m smoke

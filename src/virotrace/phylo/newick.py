@@ -29,7 +29,11 @@ def parse_newick(text: str) -> Tree:
     if not s.endswith(";"):
         raise ContractError("newick: missing terminating ';'")
     s = s[:-1]
-    parent, length, children, name, label = [-1], [0.0], [[]], [""], [""]
+    parent: list[int] = [-1]
+    length: list[float] = [0.0]
+    children: list[list[int]] = [[]]
+    name: list[str] = [""]
+    label: list[str] = [""]
     stack: list[int] = []
     cur = 0
     i = 0

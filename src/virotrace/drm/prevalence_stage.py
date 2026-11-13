@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -72,7 +73,7 @@ def year_bin(year: int, width: int) -> str:
     return f"{start}-{start + width - 1}"
 
 
-def _class_positions(entries, drug_class: str) -> set[int]:
+def _class_positions(entries: Iterable[tuple[str, int]], drug_class: str) -> set[int]:
     gene = gene_of_class(drug_class)
     return {pos for (g, pos) in entries if g == gene and drug_class_of(g, pos) == drug_class}
 
@@ -107,19 +108,25 @@ STUDY_COLUMNS = [
 ]
 
 
-def _study_summary(population, coverage, hits, qc, headline_list) -> list[dict[str, Any]]:
+def _study_summary(
+    population: Mapping[str, Mapping[str, Any]],
+    coverage: Mapping[str, list[dict[str, str]]],
+    hits: Mapping[tuple[str, str], set[str]],
+    qc: Any,
+    headline_list: Any,
+) -> list[dict[str, Any]]:
     """Per study: size, years, stated treatment context and headline-list prevalence.
 
     The diagnostic that shows whether a stratum is one study. ``NRTI`` etc. read
     ``resistant/denominator``; a class with no qualifying sequences reads ``0/0``.
     """
     by_study: dict[str, list[str]] = defaultdict(list)
-    for strain, row in population.items():
-        by_study[row.get("study_key", "").strip() or "unknown_study"].append(strain)
-    rows = []
+    for strain, member in population.items():
+        by_study[member.get("study_key", "").strip() or "unknown_study"].append(strain)
+    rows: list[dict[str, Any]] = []
     for key, strains in by_study.items():
         years = [int(population[s]["year"]) for s in strains if population[s]["year"].strip()]
-        statuses = defaultdict(int)
+        statuses: defaultdict[str, int] = defaultdict(int)
         for s in strains:
             statuses[population[s].get("treatment_hint", "").strip() or "unknown"] += 1
         top_status = max(statuses, key=lambda k: statuses[k])
@@ -197,22 +204,25 @@ def run_prevalence(settings: Settings, *, repo_root: Path | str = ".") -> dict[s
         if calls_path.exists()
         else None
     )
-    typed = []
+    typed: list[dict[str, Any]] = []
     for r in meta_rows:
-        row = {**r, "clone_derived": r.get("clone_derived", "").strip().lower() == "true"}
-        note = annotations.get(row.get("study_key", ""))
+        item: dict[str, Any] = {
+            **r,
+            "clone_derived": r.get("clone_derived", "").strip().lower() == "true",
+        }
+        note = annotations.get(item.get("study_key", ""))
         # The keyword hint is shown for review but never stratifies: it mislabelled a study
         # with 61% NRTI resistance as naive. Only hand-curated annotations do.
         if called is not None:
-            row["subtype_called"] = called.get(row["strain"], "unassigned")
-        row["treatment_hint"] = row.get("treatment_status", "")
-        row["annotation"] = note["treatment_context"] if note else ""
-        row["treatment_status"] = (
+            item["subtype_called"] = called.get(item["strain"], "unassigned")
+        item["treatment_hint"] = item.get("treatment_status", "")
+        item["annotation"] = note["treatment_context"] if note else ""
+        item["treatment_status"] = (
             note["treatment_context"]
             if note and note["treatment_context"] != "unknown"
             else "unannotated"
         )
-        typed.append(row)
+        typed.append(item)
     kept, removed = apply_population_policies(
         typed,
         clone_policy=qc.clone_policy,
@@ -222,19 +232,19 @@ def run_prevalence(settings: Settings, *, repo_root: Path | str = ".") -> dict[s
     population = {r["strain"]: r for r in kept}
 
     coverage: dict[str, list[dict[str, str]]] = defaultdict(list)
-    for row in read_tsv(paths["drm call (coverage)"]):
-        if row["strain"] in population:
-            coverage[row["strain"]].append(row)
+    for crow in read_tsv(paths["drm call (coverage)"]):
+        if crow["strain"] in population:
+            coverage[crow["strain"]].append(crow)
 
     hits: dict[tuple[str, str], set[str]] = defaultdict(set)  # (role, class) -> strains
-    for row in read_tsv(paths["drm call"]):
-        if row["strain"] not in population:
+    for hrow in read_tsv(paths["drm call"]):
+        if hrow["strain"] not in population:
             continue
         for role, _list, _qual, sens, _entries in lists:
             column = "is_sdrm_sensitivity" if sens else "is_sdrm"
-            if row[column].strip().lower() != "true":
+            if hrow[column].strip().lower() != "true":
                 continue
-            hits[(role, drug_class_of(row["gene"], int(row["position"])))].add(row["strain"])
+            hits[(role, drug_class_of(hrow["gene"], int(hrow["position"])))].add(hrow["strain"])
 
     width = cfg.year_bin_width
     out_rows: list[dict[str, Any]] = []
@@ -246,7 +256,7 @@ def run_prevalence(settings: Settings, *, repo_root: Path | str = ".") -> dict[s
         "lists": {},
     }
 
-    def strata_of(row: dict[str, str]) -> list[tuple[str, str]]:
+    def strata_of(row: Mapping[str, Any]) -> list[tuple[str, str]]:
         found = [("overall", "all")]
         if row["year"].strip():
             found.append(("year_bin", year_bin(int(row["year"]), width)))
@@ -285,7 +295,7 @@ def run_prevalence(settings: Settings, *, repo_root: Path | str = ".") -> dict[s
                 continue
             gene = gene_of_class(drug_class)
             counts: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
-            for strain, row in population.items():
+            for strain, member in population.items():
                 if not _qualifies(
                     coverage[strain],
                     gene,
@@ -295,7 +305,7 @@ def run_prevalence(settings: Settings, *, repo_root: Path | str = ".") -> dict[s
                 ):
                     continue
                 carries = strain in hits[(role, drug_class)]
-                for key in strata_of(row):
+                for key in strata_of(member):
                     counts[key][1] += 1
                     counts[key][0] += carries
             for (kind, label), (num, den) in sorted(counts.items()):
