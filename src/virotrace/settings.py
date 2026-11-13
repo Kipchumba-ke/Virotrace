@@ -176,6 +176,8 @@ class TemporalGateConfig(_Base):
     min_temporal_r2: float = Field(0.10, ge=0, le=1)
     require_positive_slope: bool = True
     date_randomisation: bool = False
+    # also report a study-level randomisation p (informational: it never fails the gate)
+    study_randomisation: bool = False
     # shuffles for the date-randomisation test; 99 gives a smallest p of 0.01
     n_permutations: int = Field(99, ge=19, le=9999)
     max_permutation_p: float = Field(0.05, gt=0, le=1)

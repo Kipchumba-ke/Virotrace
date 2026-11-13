@@ -204,3 +204,50 @@ def permutation_p(
         if linear_regression(used, d)[2] >= observed_r2:
             hits += 1
     return (hits + 1) / (n + 1)
+
+
+def study_permutation_p(
+    tree: Any,
+    dates: Sequence[float],
+    observed_r2: float,
+    groups: Sequence[str],
+    *,
+    subset: Sequence[bool] | None = None,
+    n: int = 100,
+    seed: int = 0,
+    require_positive_slope: bool = True,
+) -> float:
+    """Study-level date randomisation: shuffle between-study offsets, keep within-study spread.
+
+    Tips from one study share dates and often sit together on the tree, so shuffling single
+    tips breaks that structure and makes a weak signal look significant. Here every tip keeps
+    its distance from its own study's mean date, and the study means are permuted among the
+    studies. A signal that survives is not just "late studies sit on late branches".
+    With fewer than three studies there is nothing to permute and the p-value is 1.
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    y = np.asarray(dates, dtype=float)
+    keep = np.ones(len(y), dtype=bool) if subset is None else np.asarray(subset, dtype=bool)
+    labels = np.asarray(list(groups))
+    members = {g: np.flatnonzero(keep & (labels == g)) for g in sorted(set(labels[keep]))}
+    if len(members) < 3:
+        return 1.0
+    names = list(members)
+    means = np.array([y[members[g]].mean() for g in names])
+    hits = 0
+    for _ in range(n):
+        permuted = rng.permutation(means)
+        shuffled = y.copy()
+        for g, new_mean, old_mean in zip(names, permuted, means, strict=True):
+            shuffled[members[g]] = y[members[g]] - old_mean + new_mean
+        used, d = best_root_to_tip(
+            tree,
+            shuffled.tolist(),
+            subset=keep.tolist(),
+            require_positive_slope=require_positive_slope,
+        )
+        if linear_regression(used, d)[2] >= observed_r2:
+            hits += 1
+    return (hits + 1) / (n + 1)

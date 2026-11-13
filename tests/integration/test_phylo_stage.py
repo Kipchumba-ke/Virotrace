@@ -25,6 +25,7 @@ from virotrace.phylo.temporal import (
     decimal_year,
     evaluate_gate,
     permutation_p,
+    study_permutation_p,
 )
 from virotrace.settings import load_settings
 
@@ -238,6 +239,33 @@ def test_permutation_p_separates_clock_from_noise():
     used, d = best_root_to_tip(tree, noisy)
     r2n = evaluate_gate(used, d).r_squared
     assert permutation_p(tree, noisy, r2n, n=99, seed=1) > 0.05
+
+
+def test_study_permutation_needs_enough_studies_to_claim_signal():
+    tree = parse_newick(_clock_tree(YEARS, odd_root=False))
+    order = [int(tree.name[t][1:]) for t in tree.tips]
+    dates = [YEARS[i] for i in order]
+    used, d = best_root_to_tip(tree, dates)
+    r2 = evaluate_gate(used, d).r_squared
+    # one study per tip: the study null is the tip null, and a real clock stands out
+    singles = [f"s{i}" for i in order]
+    assert study_permutation_p(tree, dates, r2, singles, n=99, seed=1) <= 0.05
+    # three studies cannot give p below 1/6, however clean the signal
+    pairs = [f"s{i // 2}" for i in order]
+    assert study_permutation_p(tree, dates, r2, pairs, n=99, seed=1) > 0.05
+    # fewer than three studies leaves nothing to permute
+    assert study_permutation_p(tree, dates, r2, ["a"] * len(dates), n=19, seed=1) == 1.0
+
+
+def test_study_permutation_keeps_within_study_spread():
+    tree = parse_newick(_clock_tree(YEARS, odd_root=False))
+    order = [int(tree.name[t][1:]) for t in tree.tips]
+    dates = [YEARS[i] for i in order]
+    groups = [f"s{i % 3}" for i in order]
+    # same inputs and seed must reproduce the same p
+    a = study_permutation_p(tree, dates, 0.5, groups, n=29, seed=7)
+    b = study_permutation_p(tree, dates, 0.5, groups, n=29, seed=7)
+    assert a == b and 0 < a <= 1
 
 
 def test_failed_gate_roots_at_the_midpoint_and_reports_undated(workspace):

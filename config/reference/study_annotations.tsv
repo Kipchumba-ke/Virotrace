@@ -12,5 +12,17 @@ REF:Scallon|clinical-psychosocial-and-structural-fac	experienced	Children living
 PMID:32027734	naive	RV217 acute-infection cohort (East Africa and Thailand) sampled at diagnosis, before ART. Records have no collection dates; isolate naming should be checked for the individual policy.
 PMID:21770741	unknown	Patients attending a rural district hospital on the Kenyan coast (2008); ART status not stated in the abstract; check Methods.
 PMID:31724034	experienced	ACTG A5288 screening: virologic failure on second-line PI-based ART with 3-class experience or resistance.
-PMID:22900472	naive	Hassan et al. 2013; ARV-naive adults enrolling at a rural Kenyan HIV clinic, two cross-sectional studies 2008-2010.
-REF:Onywera|surveillance-of-hiv-1-pol-transmitted-dr	naive	Onywera et al. 2017; drug-naive adults with acute or recent infection (AHI/RHI), rural western Kenya, 2012 household survey.
+PMID:21802367	naive	PASER-M (Hamers 2011 Lancet ID): ART-naive adults not yet on first-line ART, 2007-2009, Kenya/Nigeria/South Africa/Uganda/Zambia/Zimbabwe. Abstract checked.
+PMID:20585262	naive	Hamers 2010 JAIDS: pre-treatment samples from persons initiating ART in Lusaka (PASER). Title states it; abstract not read.
+PMID:21091377	naive	Price 2011: ARV-naive volunteers diagnosed within a year of infection (IAVI early-infection cohort). Abstract checked.
+PMID:24960249	naive	Lee 2014: treatment-naive UARTO participants (Kampala, Mbarara), pre-therapy samples. Abstract checked.
+PMID:25003939	naive	Kiwelu 2014: ART-naive female bar and hotel workers, Moshi, enrolled 2004-2007. Text checked.
+PMID:23221345	naive	Liu 2013 JCI: acute-infection cohort followed ART-naive; sequences are within-host time series. Text checked, individual cohort tables not read.
+REF:Derache|impact-of-hiv-pre-treatment-drug-resista	naive	ANRS 12249 TasP: participants reporting no prior ART at entry; pre-treatment sequences (Derache 2018 CID). Abstract checked.
+PMID:23840622	experienced	Van Zyl 2013: patients with virological failure on first- or second-line ART, Tygerberg lab 2006-2012. Abstract checked.
+PMID:27659733	experienced	Steegen 2016: patients failing NNRTI-based ART, national survey 2013-2014. Title; the doravirine paper confirms the same survey.
+PMID:26413747	experienced	Gag p6 study: South African cohort with ART failure (n=845). Abstract checked.
+PMID:32515898	experienced	Hermans 2020: virological failure on LPV/r second-line ART. Abstract checked.
+PMID:35895893	experienced	Children and adolescents failing ART (title). Abstract not read.
+PMID:35917929	experienced	Patients failing first-line ART in Ethiopia (title). Abstract not read.
+PMID:33943000	experienced	Steegen 2021: this study pools three groups; the sequences in this corpus are 2016-2018, matching the NNRTI-failure testing group (2013-2014 survey groups are other records). Inferred from dates; verify.

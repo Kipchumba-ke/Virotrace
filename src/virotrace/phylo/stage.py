@@ -24,7 +24,13 @@ from ..io.fasta import read_fasta, write_fasta
 from ..io.tables import read_tsv, write_tsv
 from ..settings import Settings
 from .newick import Tree, midpoint_edge, parse_newick, to_newick
-from .temporal import best_root_to_tip, decimal_year, evaluate_gate, permutation_p
+from .temporal import (
+    best_root_to_tip,
+    decimal_year,
+    evaluate_gate,
+    permutation_p,
+    study_permutation_p,
+)
 
 Runner = Callable[[Sequence[str]], None]
 MIN_SUBTYPE_TIPS = 30
@@ -178,8 +184,18 @@ def _gate(settings: Settings, tree: Tree, rows: list[dict[str, str]]) -> dict[st
                     f"R^2 {result.r_squared:.3f} is not distinguishable from shuffled dates "
                     f"(permutation p = {p:.3f}, limit {gate_cfg.max_permutation_p})"
                 )
+        if gate_cfg.study_randomisation:
+            out["study_permutation_p"] = round(
+                study_permutation_p(
+                    tree, y, result.r_squared, studies, subset=mask, n=gate_cfg.n_permutations,
+                    seed=settings.stage_seed("temporal_gate_study"),
+                    require_positive_slope=gate_cfg.require_positive_slope,
+                ),
+                4,
+            )  # fmt: skip
         return out
 
+    studies = [r.get("study_key", "") or "unknown_study" for r in tip_rows]
     out = {
         "n_tips": len(tip_rows),
         "n_undated": usable.count(False),

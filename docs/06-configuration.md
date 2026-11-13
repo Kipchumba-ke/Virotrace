@@ -190,6 +190,7 @@ phylo:
     min_temporal_r2: 0.10
     require_positive_slope: true
     date_randomisation: false    # true at kenya scope once n is known
+    study_randomisation: false   # also report a study-level date-shuffle p; informational only
   traits:
     enabled: false   # `phylo traits` is not implemented yet; the DAG leaves the rule out while false
     columns: [country_code, region]

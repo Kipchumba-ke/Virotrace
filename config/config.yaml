@@ -175,6 +175,7 @@ phylo:
     min_temporal_r2: 0.10
     require_positive_slope: true
     date_randomisation: false
+    study_randomisation: false   # report a study-level date-shuffle p beside the gate; never fails it
   traits:
     enabled: false   # `phylo traits` is not implemented yet; the DAG leaves the rule out while false
     columns: [country_code, region]
