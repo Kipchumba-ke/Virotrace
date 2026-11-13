@@ -49,6 +49,10 @@ REFERENCES = [
 ]
 
 EXTRA_LIMITATIONS = [
+    "Resistance calls in sequences from before antiretroviral therapy existed are not evidence "
+    "of transmitted resistance. The WHO surveillance list counts any listed mutation, so "
+    "natural polymorphisms in early samples are scored as resistance. Read the earliest year "
+    "bins as a floor of natural variation.",
     "Country is the GenBank country qualifier. Multi-site trial cohorts (for example the RV217 "
     "and HVTN 703 isolates) may carry a single country tag for participants enrolled elsewhere; "
     "participant sites have not been verified, and these participants are a small share of "
@@ -121,7 +125,13 @@ def limitations(root: Path, scope: str = "kenya") -> list[str]:
             )
             for i in items
         ]
-    return items + EXTRA_LIMITATIONS
+    extra = list(EXTRA_LIMITATIONS)
+    if scope == "africa":
+        extra[0] += (
+            " In this build the RT M41L calls in Ugandan sequences from 1986 are the "
+            "clearest case: zidovudine was not yet in use."
+        )
+    return items + extra
 
 
 def _prevalence_sections(results: Path) -> str:

@@ -176,6 +176,16 @@ def test_limitations_name_the_scope_of_the_build(tmp_path):
     assert any("the Kenyan epidemic" in i for i in limitations(tmp_path, "kenya"))
 
 
+def test_early_sample_caveat_is_in_every_report_and_the_example_only_in_africa(tmp_path):
+    import shutil
+
+    shutil.copytree("docs", tmp_path / "docs")
+    kenya = [i for i in limitations(tmp_path, "kenya") if "before antiretroviral" in i]
+    africa = [i for i in limitations(tmp_path, "africa") if "before antiretroviral" in i]
+    assert len(kenya) == len(africa) == 1
+    assert "1986" not in kenya[0] and "M41L" in africa[0]
+
+
 def test_underflowed_p_values_are_shown_as_a_bound_not_zero():
     from virotrace.export.report import _p_text
 

@@ -26,3 +26,17 @@ PMID:32515898	experienced	Hermans 2020: virological failure on LPV/r second-line
 PMID:35895893	experienced	Children and adolescents failing ART (title). Abstract not read.
 PMID:35917929	experienced	Patients failing first-line ART in Ethiopia (title). Abstract not read.
 PMID:33943000	experienced	Steegen 2021: this study pools three groups; the sequences in this corpus are 2016-2018, matching the NNRTI-failure testing group (2013-2014 survey groups are other records). Inferred from dates; verify.
+REF:Hunt|low-to-moderate-levels-of-transmitted-hi	naive	Hunt 2012: transmitted-resistance survey in South Africa, 2010-2011 (title). Population ART-naive by design; abstract not read.
+PMID:22544199	naive	Surveillance of transmitted HIV-1 drug resistance, Gauteng and KwaZulu-Natal 2005-2009 (title). Abstract not read.
+PMID:19918101	naive	Pre-therapy patients, Free State, 2006 (title). Abstract not read.
+PMID:29765082	naive	Pretreatment resistance in a countrywide Ethiopian cohort, 2010 (title). Abstract not read.
+PMID:25582324	naive	Cohort eligible for ART initiation, Abuja, 2008 (title). Abstract not read.
+REF:Asio|emergence-of-acquired-hiv-drug-resistanc	experienced	Acquired resistance on dolutegravir-based ART, Uganda 2023 (title). Abstract not read.
+PMID:27342228	experienced	Patients on second-line regimens, late switch, Cameroon/Burkina Faso/Senegal (title). Abstract not read.
+REF:Steegen|prevalence-of-protease-inhibitor-and-tri	experienced	Patients failing second-line ART, South African national survey 2013-2014 (title).
+PMID:20964479	experienced	Nigerian patients failing first-line therapy (title). Abstract not read.
+PMID:24816790	experienced	South African children failing abacavir- or stavudine-based first-line ART (title).
+PMID:30060027	experienced	Patients failing protease-inhibitor monotherapy as second-line (title).
+PMID:42432698	experienced	Virological failure on second-line ART, Zimbabwe 2021-2024 (title).
+PMID:23991055	experienced	Adults failing first-line ART, rural KwaZulu-Natal programme (title).
+PMID:40391923	experienced	DTG RESIST: viremia on dolutegravir-based ART (title).
