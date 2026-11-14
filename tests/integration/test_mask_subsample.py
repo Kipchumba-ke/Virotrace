@@ -115,3 +115,26 @@ def test_year_only_sensitivity_keeps_year_precision(workspace, config_path):
         summary["waterfall"]["after_date_requirement"]
         == summary["waterfall"]["after_recombination_policy"]
     )
+
+
+def test_a_tip_with_no_close_relative_is_dropped_from_the_tree_set_and_reported(workspace):
+    settings, tmp = workspace
+    settings = settings.model_copy(
+        update={
+            "subsample": settings.subsample.model_copy(
+                update={"max_per_stratum": 10, "min_neighbour_identity": 0.9}
+            )
+        }
+    )
+    run_mask(settings, repo_root=".")
+    base = "ACGT" * 150
+    odd = "".join({"A": "C", "C": "G", "G": "T", "T": "A"}[c] for c in base)
+    masked = tmp / "interim/kenya/aln.pol.masked.fasta"
+    write_fasta(masked, [(s, odd if s == "s8" else base) for s, _ in read_fasta(masked)], wrap=0)
+    summary = run_subsample(settings, repo_root=".")
+    assert [r["strain"] for r in summary["neighbour_screen"]["removed"]] == ["s8"]
+    assert "s8" not in {s for s, _ in read_fasta(tmp / "processed/kenya/aln.tree.fasta")}
+    assert "s8" not in {r["strain"] for r in read_tsv(tmp / "processed/kenya/metadata.final.tsv")}
+    wf = summary["waterfall"]
+    assert wf["after_neighbour_screen"] == wf["retained"] - 1
+    assert (tmp / "results/kenya/qc/subsample_neighbour_screen.tsv").exists()

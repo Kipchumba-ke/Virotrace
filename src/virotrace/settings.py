@@ -122,6 +122,10 @@ class SubsampleConfig(_Base):
     # Which dates may reach the time tree: strict = day or month precision (the primary
     # analysis), year = also year-only (the sensitivity run), none = undated tips allowed.
     date_requirement: Literal["strict", "year", "none"] = "strict"
+    # Drop tree-set tips whose best identity to any other tip is below this (0 = off). Such a
+    # tip has no close relative, gets a very long branch and stretches the tree axis.
+    min_neighbour_identity: float = Field(0.0, ge=0.0, le=1.0)
+    neighbour_min_shared: int = Field(500, ge=1)  # sites two tips must share to be compared
 
     @model_validator(mode="after")
     def _min_not_above_max(self) -> SubsampleConfig:

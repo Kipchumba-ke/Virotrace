@@ -258,10 +258,23 @@ def _data_section(results: Path) -> str:
             out.append(f"<p>After the policies: {after.get('n_total')} individuals, {dated}.</p>")
     if sub:
         out.append("<h3>Tree set</h3>")
+        wf = sub["waterfall"]
+        n_tree = wf.get("after_neighbour_screen", wf.get("retained"))
         out.append(
-            f"<p>{sub['waterfall'].get('retained')} individuals with strictly dated sequences, "
+            f"<p>{n_tree} individuals with strictly dated sequences, "
             f"{sub['year_span'][0]} to {sub['year_span'][1]}. Counts by subtype and year:</p>"
         )
+        removed = (sub.get("neighbour_screen") or {}).get("removed") or []
+        if removed:
+            names = ", ".join(escape(str(r["strain"])) for r in removed)
+            out.append(
+                f"<p>{len(removed)} sequences were left out of the tree because none of the "
+                f"others is within the identity floor of "
+                f"{sub['neighbour_screen']['threshold']:.0%} (nearest-neighbour identity over "
+                f"shared sites): {names}. Such tips are misaligned or from a distant lineage and "
+                f"give the tree a branch many times longer than any real split. They remain in "
+                f"the resistance prevalence.</p>"
+            )
         out.append(_table(["Subtype", "n"], [[k, v] for k, v in sub.get("by_subtype", {}).items()]))
         out.append(
             _table(["Year", "n"], [[k, v] for k, v in sorted(sub.get("by_year", {}).items())])

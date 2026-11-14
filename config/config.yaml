@@ -125,6 +125,8 @@ subsample:
   min_per_stratum: 1
   priority: [date_precision, gene_coverage, ambiguity_frac]
   date_requirement: strict       # strict (day/month) | year (+ year-only, sensitivity) | none
+  min_neighbour_identity: 0.86   # drop tree-set tips with no relative this close (0 = off)
+  neighbour_min_shared: 500      # sites two tips must share to be compared
 
 drm:
   algorithm: hivdb
@@ -177,7 +179,7 @@ phylo:
     date_randomisation: false
     study_randomisation: false   # report a study-level date-shuffle p beside the gate; never fails it
   traits:
-    enabled: true  # true adds `phylo traits` (augur mugration) and its Auspice colourings
+    enabled: false   # true adds `phylo traits` (augur mugration) and its Auspice colourings
     columns: [country_code, region]
     admin1:
       enabled: auto

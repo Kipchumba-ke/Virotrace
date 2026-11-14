@@ -27,6 +27,7 @@ from ..io.fasta import read_fasta, write_fasta
 from ..io.tables import read_tsv, write_tsv
 from ..settings import Settings
 from .clones import apply_population_policies
+from .neighbours import nearest_identity
 from .subsample import stratified_subsample
 
 _DATED = {
@@ -129,6 +130,30 @@ def run_subsample(settings: Settings, *, repo_root: Path | str = ".") -> dict[st
         raise ContractError(
             f"{len(keep) - len(aln)} tree-set sequences missing from the masked alignment"
         )
+    screen: dict[str, Any] = {"threshold": cfg.min_neighbour_identity, "removed": []}
+    if final:
+        ident = nearest_identity(
+            [aln[r["strain"]] for r in final], min_shared=cfg.neighbour_min_shared
+        )
+        finite = sorted(x for x in ident if x == x)
+        screen["lowest"] = [round(x, 4) for x in finite[:10]]
+        if cfg.min_neighbour_identity > 0:
+            dropped = [
+                (r, x) for r, x in zip(final, ident, strict=True) if x < cfg.min_neighbour_identity
+            ]
+            screen["removed"] = [
+                {"strain": r["strain"], "subtype": r["subtype_called"], "identity": round(x, 4)}
+                for r, x in dropped
+            ]
+            gone = {r["strain"] for r, _ in dropped}
+            final = [r for r in final if r["strain"] not in gone]
+            keep -= gone
+            write_tsv(
+                results / "qc" / "subsample_neighbour_screen.tsv",
+                screen["removed"],
+                ["strain", "subtype", "identity"],
+            )
+    waterfall["after_neighbour_screen"] = len(final)
     write_fasta(
         processed / "aln.tree.fasta", [(r["strain"], aln[r["strain"]]) for r in final], wrap=0
     )
@@ -151,6 +176,7 @@ def run_subsample(settings: Settings, *, repo_root: Path | str = ".") -> dict[st
         "date_requirement": cfg.date_requirement,
         "subsample_enabled": cfg.enabled,
         "waterfall": waterfall,
+        "neighbour_screen": screen,
         "by_year": dict(sorted(Counter(r["year"] for r in final).items())),
         "by_subtype": dict(Counter(r["subtype_called"] for r in final).most_common()),
         "by_study": dict(Counter(r["study_key"] for r in final).most_common(10)),

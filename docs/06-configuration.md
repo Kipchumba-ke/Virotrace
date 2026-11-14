@@ -141,6 +141,9 @@ subsample:
   min_per_stratum: 1
   priority: [date_precision, gene_coverage, ambiguity_frac]
   date_requirement: strict       # strict (day/month) | year (+ year-only, sensitivity) | none
+  min_neighbour_identity: 0.86   # drop tree-set tips whose best match over shared sites is
+                                 # below this (0 = off); listed in the report, still in prevalence
+  neighbour_min_shared: 500      # sites two tips must share to be compared
 
 drm:
   algorithm: hivdb

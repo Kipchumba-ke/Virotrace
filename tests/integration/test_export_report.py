@@ -233,3 +233,20 @@ def test_the_report_ends_with_references_before_provenance(tmp_path):
     from virotrace.export.report import REFERENCES
 
     assert any("PLoS ONE" in r for r in REFERENCES) and len(REFERENCES) >= 8
+
+
+def test_tree_set_section_names_tips_dropped_by_the_neighbour_screen(workspace):
+    settings, tmp = workspace
+    path = tmp / "results/kenya/qc/subsample_summary.json"
+    path.write_text(
+        json.dumps({"waterfall": {"retained": 60, "after_neighbour_screen": 58},
+                    "year_span": [2008, 2020], "by_subtype": {"A1": 58}, "by_year": {"2010": 58},
+                    "neighbour_screen": {"threshold": 0.86, "removed": [
+                        {"strain": "KP223764.1", "subtype": "B", "identity": 0.835},
+                        {"strain": "KT183251.1", "subtype": "B", "identity": 0.846}]}})
+    )  # fmt: skip
+    run_report(settings, repo_root=tmp)
+    html = (tmp / "reports/kenya/index.html").read_text()
+    assert "58 individuals with strictly dated sequences" in html
+    assert "2 sequences were left out of the tree" in html and "KP223764.1, KT183251.1" in html
+    assert "86%" in html and "remain in the resistance prevalence" in html

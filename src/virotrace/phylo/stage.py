@@ -128,9 +128,12 @@ def run_tree(
     if not treefile.exists():
         raise ContractError(f"IQ-TREE produced no tree at {treefile}")
     shutil.copyfile(treefile, p["tree"])
-    parse_newick(p["tree"].read_text())  # fail here, not three stages later
+    tree = parse_newick(p["tree"].read_text())  # fail here, not three stages later
+    longest = sorted(((tree.length[i], tree.name[i]) for i in tree.tips), reverse=True)[:5]
     return {
-        "scope": settings.scope, "subtype": subtype, "command": command, "tree": str(p["tree"])
+        "scope": settings.scope, "subtype": subtype, "command": command, "tree": str(p["tree"]),
+        # a terminal branch far above the rest (IQ-TREE caps at 10) is a tip with no relatives
+        "longest_terminal_branches": [{"tip": n, "length": round(x, 4)} for x, n in longest],
     }  # fmt: skip
 
 
