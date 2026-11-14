@@ -121,6 +121,14 @@ def test_colourings_only_name_columns_that_exist():
     assert [c["key"] for c in config["colorings"]] == ["subtype", "study"]
 
 
+def test_reconstructed_traits_never_repeat_a_colouring_or_filter_key():
+    cols = ["strain", "subtype", "region", "country"]
+    config = auspice_config("t", cols, ["country_code", "region", "country_code"])
+    keys = [c["key"] for c in config["colorings"]]
+    assert keys == ["subtype", "region", "country", "country_code"]
+    assert len(config["filters"]) == len(set(config["filters"]))
+
+
 def test_missing_inputs_name_the_stage_to_run(workspace):
     settings, tmp = workspace
     (tmp / "results/kenya/phylo/A1/tree.refined.nwk").unlink()

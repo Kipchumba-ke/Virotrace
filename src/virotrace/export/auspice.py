@@ -124,7 +124,11 @@ def auspice_config(
         _coloring("year", "Year", "ordinal"),
     ]
     present = [c for c in candidates if c["key"] in columns]
-    present += [_coloring(t, f"{t} (reconstructed)") for t in traits or []]
+    # a reconstructed trait can share a key with a metadata column (region); Auspice needs unique keys
+    seen = {c["key"] for c in present}
+    present += [
+        _coloring(t, f"{t} (reconstructed)") for t in dict.fromkeys(traits or []) if t not in seen
+    ]
     return {
         "title": title,
         "maintainers": [{"name": "Virotrace"}],

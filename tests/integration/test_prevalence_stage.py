@@ -255,6 +255,33 @@ def test_one_per_individual_shrinks_the_population_and_annotations_override_the_
     assert statuses == {"experienced"}
 
 
+def test_naive_year_bins_exist_only_for_naive_annotated_studies(config_path, workspace):
+    settings, tmp = workspace
+    meta_path = tmp / "interim" / "kenya" / "metadata.valid.tsv"
+    rows = read_tsv(meta_path)
+    for row in rows:
+        row["study_key"] = "REF:Test|study"
+    write_tsv(meta_path, rows, list(rows[0]))
+    (tmp / "annotations.tsv").write_text(
+        "study_key\ttreatment_context\tnote\nREF:Test|study\tnaive\ttest\n"
+    )
+    custom = load_settings(
+        config_path,
+        "dev",
+        {
+            "paths": settings.paths,
+            "drm": settings.drm.model_dump(),
+            "prevalence": {"study_annotations": "annotations.tsv"},
+        },
+    )
+    run_prevalence(custom)
+    naive = _rows(tmp, list_role="headline", drug_class="NRTI", stratum_kind="naive_year_bin")
+    plain = _rows(tmp, list_role="headline", drug_class="NRTI", stratum_kind="year_bin")
+    assert naive and {r["stratum"] for r in naive} == {r["stratum"] for r in plain}
+    run_prevalence(settings)  # no annotation file: nothing is naive
+    assert not _rows(tmp, list_role="headline", drug_class="NRTI", stratum_kind="naive_year_bin")
+
+
 def test_annotation_file_is_validated(tmp_path):
     from virotrace.curate.study import load_study_annotations
 

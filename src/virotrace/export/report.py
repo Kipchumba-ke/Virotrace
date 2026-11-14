@@ -182,7 +182,13 @@ def _prevalence_sections(results: Path) -> str:
                     ]
                     cells.append(_estimate(match[0]) if match else "not assessed")
                 table_rows.append([stratum, *cells])
-            label = "Overall" if kind == "overall" else f"By {kind.replace('_', ' ')}"
+            label = (
+                "Overall"
+                if kind == "overall"
+                else "Treatment-naive studies only, by year bin"
+                if kind == "naive_year_bin"
+                else f"By {kind.replace('_', ' ')}"
+            )
             out.append(f"<h4>{escape(label)}</h4>" + _table(["Stratum", *classes], table_rows))
             if role == "headline" and kind == "overall":
                 out.append(_pooled_note(sub, classes))

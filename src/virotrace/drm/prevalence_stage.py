@@ -260,7 +260,11 @@ def run_prevalence(settings: Settings, *, repo_root: Path | str = ".") -> dict[s
         found = [("overall", "all")]
         if row["year"].strip():
             found.append(("year_bin", year_bin(int(row["year"]), width)))
-        found.append(("treatment_status", row.get("treatment_status", "").strip() or "unannotated"))
+        status = row.get("treatment_status", "").strip() or "unannotated"
+        found.append(("treatment_status", status))
+        if status == "naive" and row["year"].strip():
+            # closest this corpus gets to a transmitted-resistance trend; still a pool of studies
+            found.append(("naive_year_bin", year_bin(int(row["year"]), width)))
         if cfg.by_country:
             found.append(("country", row.get("country", "").strip() or "unknown"))
         if cfg.also_by_subtype and called is not None:
