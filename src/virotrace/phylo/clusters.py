@@ -105,6 +105,25 @@ def mantel_haenszel(
     }
 
 
+def _study_adjusted(rows: list[dict[str, Any]], members: dict[str, Any]) -> dict[str, Any]:
+    """MH odds ratio with each study as a stratum. Only studies that have both clustered and
+    unclustered sequences, and a mix of SDRM status, move the estimate; the rest drop out."""
+    cells: dict[str, list[int]] = {}
+    for r in rows:
+        key = r["study_key"] or "(none)"
+        cells.setdefault(key, [0, 0, 0, 0])
+        inside = r["strain"] in members
+        idx = (0 if r["has_sdrm"] else 1) if inside else (2 if r["has_sdrm"] else 3)
+        cells[key][idx] += 1
+    tables = [(t[0], t[1], t[2], t[3]) for t in cells.values()]
+    informative = sum(t[0] * t[3] > 0 or t[1] * t[2] > 0 for t in tables)
+    return {
+        **mantel_haenszel(tables),
+        "n_studies": len(tables),
+        "n_studies_informative": informative,
+    }
+
+
 def run_clusters(settings: Settings, *, repo_root: Path | str = ".") -> dict[str, Any]:
     root = Path(repo_root)
     processed = root / settings.paths["processed"] / settings.scope
@@ -222,6 +241,45 @@ def run_clusters(settings: Settings, *, repo_root: Path | str = ".") -> dict[str
             "sdrm": _by_membership(rows, alt["members"]),
         }
 
+    excluded = None
+    if cfg.sensitivity_exclude_studies:
+        drop = set(cfg.sensitivity_exclude_studies)
+        keep = [k for k, s in enumerate(strains) if study[k] not in drop]
+        kept_strains = [strains[k] for k in keep]
+        alt = _cluster(
+            kept_strains,
+            [sequences[k] for k in keep],
+            cfg.threshold,
+            cfg.min_overlap,
+            cfg.min_size,
+        )
+        sub_rows = [r for r in rows if r["study_key"] not in drop]
+        alt_tables = []
+        for context in sorted({r["treatment_context"] for r in sub_rows}):
+            grp = [r for r in sub_rows if r["treatment_context"] == context]
+            inside = [r for r in grp if r["strain"] in alt["members"]]
+            outside = [r for r in grp if r["strain"] not in alt["members"]]
+            alt_tables.append(
+                (
+                    sum(r["has_sdrm"] for r in inside),
+                    sum(not r["has_sdrm"] for r in inside),
+                    sum(r["has_sdrm"] for r in outside),
+                    sum(not r["has_sdrm"] for r in outside),
+                )
+            )
+        excluded = {
+            "note": "listed studies removed and sequences re-clustered; primary is unchanged",
+            "excluded_studies": sorted(drop),
+            "n_sequences_removed": len(strains) - len(keep),
+            "n_sequences": len(keep),
+            "n_clusters": len(alt["groups"]),
+            "n_clustered": len(alt["members"]),
+            "proportion_clustered": round(len(alt["members"]) / len(keep), 4) if keep else None,
+            "sdrm": _by_membership(sub_rows, alt["members"]),
+            "sdrm_cluster_odds_ratio_adjusted_for_treatment_context": mantel_haenszel(alt_tables),
+            "sdrm_cluster_odds_ratio_adjusted_for_study": _study_adjusted(sub_rows, alt["members"]),
+        }
+
     clustered = [r for r in rows if r["cluster_id"]]
     summary = {
         "scope": settings.scope,
@@ -250,6 +308,7 @@ def run_clusters(settings: Settings, *, repo_root: Path | str = ".") -> dict[str
         "clusters_sharing_an_sdrm": shared,
         "sdrm_by_treatment_context": by_context,
         "sdrm_cluster_odds_ratio_adjusted_for_treatment_context": mantel_haenszel(tables),
+        "sdrm_cluster_odds_ratio_adjusted_for_study": _study_adjusted(rows, members),
         "near_identical_pairs": {
             "n": len(near),
             "within_study": sum(r["study_a"] == r["study_b"] for r in near),
@@ -257,6 +316,7 @@ def run_clusters(settings: Settings, *, repo_root: Path | str = ".") -> dict[str
         },
         "edges_by_distance": bins,
         "sensitivity_sdrm_masked": sensitivity,
+        "sensitivity_excluding_studies": excluded,
     }
     (results / "phylo" / "clusters_summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n"

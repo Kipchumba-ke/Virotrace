@@ -31,7 +31,7 @@ def workspace(config_path, tmp_path):
                 "results": str(tmp_path / "results"), "auspice": str(tmp_path / "auspice"),
                 "reports": str(tmp_path / "reports"),
             },
-            "phylo": {"refine": {"subtype_trees": ["A1"]}},
+            "phylo": {"refine": {"subtype_trees": ["A1"]}, "traits": {"enabled": False}},
         },
     )  # fmt: skip
     processed, results = tmp_path / "processed/kenya", tmp_path / "results/kenya"
@@ -150,3 +150,19 @@ def test_gene_coordinates_are_in_the_pol_alignment_frame_and_the_old_flag_is_sti
     assert (
         annotation_flag("usage: augur translate [--reference-sequence X]") == "--reference-sequence"
     )
+
+
+def test_traits_node_data_and_colourings_join_the_pooled_export_only(workspace):
+    settings, tmp = workspace
+    settings = settings.model_copy(deep=True)  # nested config defaults are shared between tests
+    settings.phylo.traits.enabled = True
+    with pytest.raises(ContractError, match="phylo traits"):
+        run_export(settings, repo_root=".", runner=lambda c: None, translate_help=lambda: "--a")
+    traits = tmp / "results/kenya/phylo/traits.json"
+    traits.write_text(json.dumps({"models": {"country_code": {}, "region": {}}}))
+    calls = []
+    run_export(settings, repo_root=".", runner=calls.append, translate_help=lambda: "--annotation")
+    pooled_export, a1_export = calls[2], calls[5]
+    assert str(traits) in pooled_export and str(traits) not in a1_export
+    config = json.loads((tmp / "results/kenya/phylo/auspice_config.json").read_text())
+    assert "country_code" in {c["key"] for c in config["colorings"]}

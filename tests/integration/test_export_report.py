@@ -92,6 +92,14 @@ def workspace(config_path, tmp_path):
                      "unclustered": {"n": 50, "with_sdrm": 20, "proportion": 0.4}},
             "sdrm_cluster_odds_ratio_adjusted_for_treatment_context":
                 {"odds_ratio": 1.3, "ci_low": 0.8, "ci_high": 2.2},
+            "sdrm_cluster_odds_ratio_adjusted_for_study":
+                {"odds_ratio": 1.12, "ci_low": 0.85, "ci_high": 1.48,
+                 "n_studies": 143, "n_studies_informative": 52},
+            "sensitivity_excluding_studies": {
+                "excluded_studies": ["S9"], "n_sequences_removed": 7,
+                "sdrm_cluster_odds_ratio_adjusted_for_study":
+                    {"odds_ratio": 1.22, "ci_low": 0.92, "ci_high": 1.63,
+                     "n_studies": 141, "n_studies_informative": 51}},
         })
     )  # fmt: skip
     (tmp_path / "docs").mkdir()
@@ -109,6 +117,8 @@ def test_report_has_headline_estimates_suppression_gates_and_clusters(workspace)
     assert "Stanford" in html and "By subtype called" in html
     assert "divergence tree" in html and "A1 tree" in html and "time tree" in html
     assert "1.3 (95% interval 0.8 to 2.2)" in html
+    assert "1.12 (95% interval 0.85 to 1.48)" in html and "52 of 143 studies" in html
+    assert "S9 removed" in html and "1.22 (95% interval 0.92 to 1.63)" in html
     assert "Not a clinical tool" in html
 
 
@@ -164,6 +174,16 @@ def test_report_shows_clock_sensitivity_and_the_tree_based_subtype_check(workspa
     assert "Clock-rate sensitivity" in html and "+9.2" in html and "1979.38" in html
     assert "Second subtype call" in html and "Unresolved is common" in html
     assert "unresolved 50" in html
+    assert "no bootstrap support values" in html and "95% bootstrap" not in html
+    summary = phylo / "subtype_tree/subtype_tree_summary.json"
+    summary.write_text(
+        json.dumps({"n_queries": 60, "n_references": 55, "min_support": 95.0,
+                    "support_used": True,
+                    "concordance": {"agree": 5, "unresolved": 50, "not_comparable": 5}})
+    )  # fmt: skip
+    run_report(settings, repo_root=tmp)
+    html = (tmp / "reports/kenya/index.html").read_text()
+    assert "95% bootstrap support" in html and "no bootstrap support values" not in html
 
 
 def test_limitations_name_the_scope_of_the_build(tmp_path):

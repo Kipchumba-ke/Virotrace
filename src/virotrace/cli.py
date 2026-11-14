@@ -339,8 +339,15 @@ def phylo_traits(
     config: ConfigOpt = Path("config/config.yaml"), profile: ProfileOpt = None
 ) -> None:
     """L3b: ancestral trait reconstruction over country and region."""
-    load_settings(config, profile)
-    _not_implemented("phylo traits")
+    from .phylo.traits import run_traits
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_traits(settings)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @phylo_app.command("clusters")

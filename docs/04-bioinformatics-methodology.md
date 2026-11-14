@@ -207,7 +207,7 @@ comparison should happen before publishing, not after a reviewer asks.
 ## 9. Stated limitations (to be carried verbatim into the report)
 
 1. Convenience sampling — results describe deposited sequences, not the Kenyan epidemic.
-2. Pretreatment vs. acquired resistance cannot be separated; treatment status is unknown for most records.
+2. Pretreatment vs. acquired resistance cannot be separated; treatment status comes from hand-curated study annotations and is unknown for a large share of records.
 3. Geographic resolution is country-level for most records; subnational inference is limited or absent.
 4. HIVdb interpretation is best validated on subtype B; Kenya's epidemic is predominantly non-B.
 5. Confirmed recombinants (by the distance screen, per the recombination tree policy) are excluded from the tree. Suspected recombinants and sequences with no subtype call stay in, so the phylogeny is not strictly the non-recombinant subset.

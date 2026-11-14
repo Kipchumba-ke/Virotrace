@@ -189,7 +189,7 @@ class Admin1Config(_Base):
 
 
 class TraitsConfig(_Base):
-    enabled: bool = False  # `phylo traits` is not implemented yet; the DAG skips it while False
+    enabled: bool = False  # off by default: the DAG skips `phylo traits` while False
     columns: list[str] = ["country_code", "region"]
     admin1: Admin1Config = Admin1Config()
 
@@ -232,6 +232,9 @@ class ClustersConfig(_Base):
     # Also cluster with SDRM codons masked, to see how much of "clustering" is convergent
     # resistance pulling sequences together. Reported beside the primary result, never instead.
     sensitivity_mask_sdrm: bool = True
+    # Study keys to drop entirely and re-cluster, to see whether one or two cohorts drive the
+    # cluster result. Empty = skip. Reported beside the primary result, never instead.
+    sensitivity_exclude_studies: list[str] = []
 
 
 class PhyloConfig(_Base):

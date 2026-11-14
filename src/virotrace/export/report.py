@@ -375,8 +375,14 @@ def _phylo_section(results: Path, subtypes: list[str]) -> str:
             "<h3>Second subtype call (tree-based)</h3>",
             f"<p>Each of {st['n_queries']} tree-set sequences was placed in a maximum-likelihood "
             f"tree of {st['n_references']} reference sequences. A call needs a clade of one "
-            f"subtype and {st['min_support']:g}% bootstrap support on the joining branch. "
-            f"Agree {c.get('agree', 0)}, disagree {c.get('disagree', 0)}, not comparable "
+            "subtype"
+            + (
+                f" and {st['min_support']:g}% bootstrap support on the joining branch. "
+                if st.get("support_used")
+                else ". This tree has no bootstrap support values, so no support threshold was "
+                "applied and calls are weaker than the support-filtered check. "
+            )
+            + f"Agree {c.get('agree', 0)}, disagree {c.get('disagree', 0)}, not comparable "
             f"{c.get('not_comparable', 0)}, unresolved {c.get('unresolved', 0)}. Unresolved is "
             "common because few references represent each subtype, so this check can confirm a "
             "call but not rule one out.</p>",
@@ -384,7 +390,6 @@ def _phylo_section(results: Path, subtypes: list[str]) -> str:
     cl = _read_json(results / "phylo" / "clusters_summary.json")
     if cl:
         s = cl["sdrm"]
-        adj = cl.get("sdrm_cluster_odds_ratio_adjusted_for_treatment_context", {})
         out += [
             "<h3>Clusters (descriptive)</h3>",
             f"<p>At a TN93 distance of {cl['threshold']}, {cl['n_clustered']} of "
@@ -408,12 +413,49 @@ def _phylo_section(results: Path, subtypes: list[str]) -> str:
                     ],
                 ],
             ),
-            f"<p>Adjusted for study treatment context (Mantel-Haenszel), the odds ratio for an "
-            f"SDRM being in a cluster is {adj.get('odds_ratio')} (95% interval "
-            f"{adj.get('ci_low')} to {adj.get('ci_high')}). The crude difference reflects which "
-            "cohorts are densely sampled.</p>",
+            *_cluster_or_paragraphs(cl),
         ]
     return "\n".join(out)
+
+
+def _or_text(block: dict[str, Any] | None) -> str | None:
+    if not block or block.get("odds_ratio") is None:
+        return None
+    return f"{block['odds_ratio']} (95% interval {block['ci_low']} to {block['ci_high']})"
+
+
+def _cluster_or_paragraphs(cl: dict[str, Any]) -> list[str]:
+    """Study-adjusted odds ratio is the headline; the treatment-context one is confounded."""
+    study: dict[str, Any] = cl.get("sdrm_cluster_odds_ratio_adjusted_for_study") or {}
+    context = _or_text(cl.get("sdrm_cluster_odds_ratio_adjusted_for_treatment_context"))
+    out: list[str] = []
+    headline = _or_text(study)
+    if headline:
+        out.append(
+            "<p>Comparing sequences only within the same study (Mantel-Haenszel, each study a "
+            f"stratum), the odds ratio for an SDRM being in a cluster is {headline}. "
+            f"{study['n_studies_informative']} of {study['n_studies']} studies contribute; the "
+            "rest lack both clustered and unclustered sequences or a mix of SDRM status. An "
+            "interval that includes 1 means no detectable difference, not evidence of "
+            "equal transmission.</p>"
+        )
+    if context:
+        out.append(
+            "<p>Adjusting for study treatment context alone gives "
+            f"{context}. This is confounded by study structure: a few densely sampled cohorts "
+            "with little resistance dominate the clusters, and most sequences have no treatment "
+            "annotation. Treat it as a comparison with the study-adjusted figure, not a "
+            "finding.</p>"
+        )
+    alt: dict[str, Any] = cl.get("sensitivity_excluding_studies") or {}
+    alt_or = _or_text(alt.get("sdrm_cluster_odds_ratio_adjusted_for_study"))
+    if alt_or:
+        out.append(
+            f"<p>With {', '.join(alt['excluded_studies'])} removed and the rest re-clustered "
+            f"({alt['n_sequences_removed']} sequences), the study-adjusted odds ratio is "
+            f"{alt_or}.</p>"
+        )
+    return out
 
 
 def render(settings: Settings, root: Path) -> str:

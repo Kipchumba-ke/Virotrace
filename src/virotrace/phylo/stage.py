@@ -556,6 +556,7 @@ def run_subtype_tree(
         "concordance": summary,
         "confusion_called_vs_tree": confusion,
         "min_support": cfg.tree_min_support,
+        "support_used": any(r["tree_support"] != "" for r in table),
     }
     (out_dir / "subtype_tree_summary.json").write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n"

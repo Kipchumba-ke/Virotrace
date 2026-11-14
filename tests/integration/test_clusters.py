@@ -154,3 +154,42 @@ def test_mantel_haenszel_single_stratum_matches_woolf():
 def test_stratification_removes_a_confounded_association():
     # within each cohort clustered and unclustered have the same SDRM rate: OR must be 1
     assert mantel_haenszel([(9, 1, 18, 2), (1, 9, 2, 18)])["odds_ratio"] == 1.0
+
+
+def test_excluding_a_study_reclusters_without_it_and_leaves_the_primary_alone(workspace):
+    settings, _ = workspace
+    off = run_clusters(settings, repo_root=".")
+    assert off["sensitivity_excluding_studies"] is None
+    settings = settings.model_copy(deep=True)  # nested config defaults are shared between tests
+    settings.phylo.clusters.sensitivity_exclude_studies = ["S2"]
+    summary = run_clusters(settings, repo_root=".")
+    assert summary["n_clusters"] == 2 and summary["n_clustered"] == 5  # primary unchanged
+    alt = summary["sensitivity_excluding_studies"]
+    assert alt["excluded_studies"] == ["S2"] and alt["n_sequences_removed"] == 2
+    assert alt["n_sequences"] == 4 and alt["n_clusters"] == 1 and alt["n_clustered"] == 3
+    assert alt["sdrm"]["clustered"]["n"] == 3 and alt["sdrm"]["unclustered"]["n"] == 1
+    assert "odds_ratio" in alt["sdrm_cluster_odds_ratio_adjusted_for_treatment_context"]
+
+
+def test_study_adjusted_or_drops_studies_with_no_contrast(workspace):
+    settings, _ = workspace
+    out = run_clusters(settings, repo_root=".")["sdrm_cluster_odds_ratio_adjusted_for_study"]
+    # S1 has clustered and unclustered sequences with a mix of SDRM status; S2 has none
+    assert out["n_studies"] == 2 and out["n_studies_informative"] <= 1
+    assert "odds_ratio" in out
+
+
+def test_study_adjustment_removes_a_between_study_association():
+    from virotrace.phylo.clusters import _study_adjusted
+
+    rows, members = [], {}
+    for study, clustered_n, rate in (("X", 20, 0.0), ("Y", 20, 0.5)):
+        for i in range(clustered_n):
+            s = f"{study}c{i}"
+            members[s] = ("CL", 2)
+            rows.append({"strain": s, "study_key": study, "has_sdrm": i < clustered_n * rate})
+        for i in range(clustered_n):
+            rows.append(
+                {"strain": f"{study}u{i}", "study_key": study, "has_sdrm": i < clustered_n * rate}
+            )
+    assert _study_adjusted(rows, members)["odds_ratio"] in (None, 1.0)

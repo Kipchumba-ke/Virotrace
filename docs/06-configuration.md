@@ -192,7 +192,7 @@ phylo:
     date_randomisation: false    # true at kenya scope once n is known
     study_randomisation: false   # also report a study-level date-shuffle p; informational only
   traits:
-    enabled: false   # `phylo traits` is not implemented yet; the DAG leaves the rule out while false
+    enabled: false   # true adds `phylo traits` (augur mugration) and its Auspice colourings
     columns: [country_code, region]
     admin1:
       enabled: auto              # auto = only if resolved fraction clears the threshold
@@ -203,6 +203,7 @@ phylo:
     threshold: 0.015
     min_size: 2
     min_overlap: 300           # shared unambiguous sites needed to compare a pair
+    sensitivity_exclude_studies: []   # study keys to drop and re-cluster; reported beside the primary
 
 report:
   min_stratum_n: 10

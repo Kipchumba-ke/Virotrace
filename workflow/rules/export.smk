@@ -15,6 +15,8 @@ def auspice_inputs(wildcards):
                 "clusters": rules.clusters.output.clusters,
             }
         )
+        if config["phylo"]["traits"]["enabled"]:
+            required["traits"] = rules.traits.output.traits
         if SUBTYPE_TREES:
             required["subtrees"] = rules.subtrees.output.tree
     return required

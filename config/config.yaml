@@ -177,7 +177,7 @@ phylo:
     date_randomisation: false
     study_randomisation: false   # report a study-level date-shuffle p beside the gate; never fails it
   traits:
-    enabled: false   # `phylo traits` is not implemented yet; the DAG leaves the rule out while false
+    enabled: true  # true adds `phylo traits` (augur mugration) and its Auspice colourings
     columns: [country_code, region]
     admin1:
       enabled: auto
@@ -188,6 +188,7 @@ phylo:
     threshold: 0.015
     min_size: 2
     min_overlap: 300         # shared unambiguous sites needed to compare a pair
+    sensitivity_exclude_studies: []   # e.g. ["PMID:23123038"]: drop these studies, re-cluster
 
 report:
   min_stratum_n: 10

@@ -109,7 +109,9 @@ def _coloring(key: str, title: str, kind: str = "categorical") -> dict[str, str]
     return {"key": key, "title": title, "type": kind}
 
 
-def auspice_config(title: str, columns: list[str]) -> dict[str, Any]:
+def auspice_config(
+    title: str, columns: list[str], traits: list[str] | None = None
+) -> dict[str, Any]:
     candidates = [
         _coloring("subtype", "Subtype (called)"),
         _coloring("cluster", "TN93 cluster (descriptive)"),
@@ -122,6 +124,7 @@ def auspice_config(title: str, columns: list[str]) -> dict[str, Any]:
         _coloring("year", "Year", "ordinal"),
     ]
     present = [c for c in candidates if c["key"] in columns]
+    present += [_coloring(t, f"{t} (reconstructed)") for t in traits or []]
     return {
         "title": title,
         "maintainers": [{"name": "Virotrace"}],
@@ -221,9 +224,17 @@ def run_export(
             f"subtype {subtype}, {kind}" if subtype else f"all subtypes, {kind}"
         )
 
+        traits_json = folder / "traits.json"
+        use_traits = subtype is None and settings.phylo.traits.enabled
+        if use_traits and not traits_json.exists():
+            raise ContractError(f"{traits_json} not found; run `virotrace phylo traits` first")
+        trait_cols = (
+            list(json.loads(traits_json.read_text()).get("models", {})) if use_traits else []
+        )
+        extra_node_data = [str(traits_json)] if use_traits else []
         config_path = folder / "auspice_config.json"
         config_path.write_text(
-            json.dumps(auspice_config(title, columns), indent=2, sort_keys=True) + "\n"
+            json.dumps(auspice_config(title, columns, trait_cols), indent=2, sort_keys=True) + "\n"
         )
         muts, aa_muts = folder / "nt_muts.json", folder / "aa_muts.json"
         name = f"virotrace_{settings.scope}" + (f"_{subtype}" if subtype else "")
@@ -244,6 +255,7 @@ def run_export(
         runner([
             "augur", "export", "v2", "--tree", str(tree), "--metadata", str(metadata),
             "--metadata-id-columns", "strain", "--node-data", str(node_data), str(muts), str(aa_muts),
+            *extra_node_data,
             "--auspice-config", str(config_path), "--title", title,
             "--description", str(description), "--output", str(output),
         ])  # fmt: skip
