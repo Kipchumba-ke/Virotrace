@@ -79,3 +79,86 @@ PMID:28069935	naive	Interferon resistance and transmission fitness, Malawi and S
 REF:Etiebet|tenofovir-disoproxil-fumarate-based-regi	experienced	Abstract checked: Nigerian adults failing NNRTI-based first-line ART, 2006-2007.
 REF:Fokam|acquired-hiv-1-drug-resistance-among-peo	experienced	Title: people failing ART, Cameroon 2021-2023.
 REF:Rasmussen|tracking-external-introductions-of-hiv-u	mixed	Population-based phylodynamics, KwaZulu-Natal 2010-2013 (title). ART status not recorded.
+REF:Zhang|utilization-of-dried-blood-spot-specimen	experienced	Abstract checked: Kenya and Tanzania 2013 acquired-resistance surveys of adults and children on ART for 12-36 months, VL>=1000.
+REF:Ulenga|hiv-1-drug-resistance-in-pregnant-women-	mixed	Title and a news report of the 2019 MDH/CDC survey (459 ART-naive and 543 ART-experienced pregnant women); match of this key to that survey inferred from title and year.
+PMID:38219684	naive	Abstract checked: ART-naive CHAVI cohort supplies the African samples; the US clinic samples in the same paper are outside the Africa set. African/CHAVI link inferred from countries and years.
+PMID:31634185	mixed	Abstract checked: TRUST/RV368 MSM sequenced at enrolment with VL>=1000; the same cohort's resistance paper reports 373 ART-naive and 42 ART-experienced.
+PMID:22784037	naive	Partners PrEP: seropositive partners not on ART; seroconverter sequences, some PrEP-exposed. Trial design checked, sequence source inferred.
+REF:Braun|pretreatment-and-acquired-hiv-drug-resis	mixed	Title: pretreatment and acquired resistance reported together, Uganda 2015.
+PMID:21837793	experienced	Title: adults failing NNRTI-based regimens, Western Cape.
+PMID:25659108	experienced	Title: patients failing tenofovir-based first-line, South Africa.
+REF:Sivay|hiv-diversity-among-young-women-attendin	naive	Title: HPTN 068 young women, enrolled HIV-negative so sequences are from incident infections; inferred from trial design, not read.
+PMID:21990420	naive	Title: HPTN 052 couples enrolled before ART; abstract not read.
+REF:Diphoko|prevalence-of-rilpivirine-and-etravirine	experienced	Title: Botswana patients failing NNRTI-based first-line.
+PMID:31361272	experienced	Title: Zimbabwe adolescents and young adults failing ART.
+PMID:29389912	experienced	Title: Ethiopian children failing first-line ART.
+PMID:31273377	mixed	Title: pre-treatment and acquired resistance reported together, Dar es Salaam 2017.
+REF:Song|analysis-of-recombinant-viral-genomes-in	naive	Title: Malawi individuals with multiple transmitted/founder infections (acute); not read.
+PMID:32025714	experienced	Title: virological failure and resistance after 12 and 48 months on first-line ART, Uganda.
+PMID:26378795	naive	Title: Zambian heterosexual transmission pairs, transmitted/founder variants; not read.
+PMID:21569325	experienced	Title: RT evolution on the way to Q151M under ART, Zambia.
+PMID:23991142	experienced	Title: emerging resistance on ART at a Cameroon sentinel site.
+PMID:23542380	naive	Title: Malawi transmitted/founder viruses; not read.
+PMID:22474222	experienced	Title: resistance patterns after first-line ART failure in six African countries.
+REF:Hunt|prevalence-of-hiv-1-drug-resistance-amon	naive	Title: newly diagnosed infants aged 4-8 weeks, South Africa. Infants are ART-naive but may be PMTCT-exposed.
+REF:Ssemwanga|high-levels-of-drug-resistant-hiv-1-amon	naive	Title: newly diagnosed ART-naive children, Uganda.
+PMID:24655349	naive	Title: chronically infected ART-naive patients, Ethiopia.
+PMID:22618567	experienced	Title: N348I emergence with failure of initial therapy, South Africa.
+PMID:16706620	naive	Title: Kenyan early infection; not read.
+PMID:29293156	mixed	Title: HPTN 052 early versus delayed ART, resistance at baseline and after failure.
+REF:Chamberland|hiv-1-primary-drug-resistance-prevalence	naive	Title: primary (pre-treatment) resistance, Cotonou 2008-2009.
+PMID:18931623	naive	Title: Cameroonian blood donors.
+PMID:31895149	experienced	Abstract checked: Togo patients on ART with VL>1000 copies/ml.
+REF:Appah|molecular-epidemiology-of-hiv-1-in-ghana	mixed	Abstract checked: 103 people living with HIV, 90% ART-naive and 10% who had stopped first-line ART at least two years earlier.
+PMID:34278422	experienced	Title: drug-resistance testing in patients with low-level viraemia on ART, South Africa.
+REF:Chimukangara|acquired-hiv-drug-resistance-and-virolog	experienced	Title: acquired resistance and virologic monitoring, KwaZulu-Natal 2019.
+REF:Ulenga|high-rates-of-early-virologic-failure-in	experienced	Title: early virologic failure in Tanzanian adults on ART.
+PMID:27125320	experienced	Title: virological failure and resistance in perinatally infected children and adolescents on lifelong ART, Togo.
+REF:Tchiakpe|acquired-resistance-of-hiv-1-to-reverse-	experienced	Title: acquired resistance in individuals with ART failure, Benin 2024.
+PMID:32071061	experienced	Title: subtype C virus from first-line ART failures (etravirine phenotype versus genotype).
+REF:Mboumba|high-levels-of-virological-failure-with-	experienced	Title: children failing after 5 years of first-line ART, Central African Republic.
+PMID:22544205	experienced	Title: WHO generic protocol pilot of resistance surveillance in children on ART, Mozambique.
+PMID:32890497	experienced	Title: virological failure and resistance in hospitalised adults, Malawi; ART status inferred from the failure definition, not read.
+PMID:31257432	experienced	Title: fisherfolk on first-line ART, Uganda.
+PMID:28745207	experienced	Abstract checked: consecutive routine genotyping samples, Cameroon 2013-2015; 61.7% had viral loads suggesting failure, patients on first- and second-line ART.
+PMID:20849302	naive	Title: antiretroviral-naive patients, Senegal 1998-2005.
+PMID:20623996	naive	Title: therapy-naive subtype C, Zambia 1998-2005.
+PMID:19276794	naive	Title: drug-naive adults with recent infection, Rakai.
+PMID:19697403	naive	Title: drug-naive patients, Burkina Faso 2004-2006.
+PMID:22952625	naive	Title: transmitted resistance among patients from three regions of Angola 2008-2010; ART status inferred from 'transmitted', not read.
+REF:Grant|a-large-population-sample-of-african-hiv	naive	Title: 1986 Ugandan samples, before antiretroviral therapy existed.
+PMID:23123038	naive	Title: transmitted/founder clones from acute infection, Uganda and Rwanda; not read.
+PMID:22693444	naive	Title: transmitted/founder and chronic subtype C viruses, Malawi, Tanzania and South Africa; ART status inferred, not read.
+PMID:23950859	mixed	Title: primary and secondary resistance after 12 months of ART, Rwanda.
+PMID:23977189	mixed	Title: resistance surveillance among treatment-experienced and naive patients, Ghana.
+PMID:29244809	mixed	Title: viraemia and resistance in female sex workers, Soweto; cross-sectional, so on-ART and off-ART not separated; not read.
+REF:Jessie|engagement-in-hiv-care-and-antiretrovira	mixed	Report checked: 125 people with unsuppressed HIV at public spots in East Africa cross-border sites; the care-continuum paper reports 43% knew their status and 87% of those were on ART.
+PMID:22036233	mixed	Abstract checked: PASER-M, patients starting NNRTI-based ART 2007-2009, pretreatment and acquired resistance at 12 months both assessed; which sequences are in this key is not known.
+PMID:17451346	naive	Title: treatment-naive patients, north Ethiopia.
+REF:Derache|genetic-diversity-and-drug-resistance-mu	naive	Title: untreated patients, Bamako.
+PMID:22900472	naive	Title: ART-naive adults at a rural clinic, Kenya.
+REF:Maruapula|low-frequency-hiv-1-drug-resistance-muta	naive	Title: ART-naive individuals, Botswana.
+REF:Onywera|surveillance-of-hiv-1-pol-transmitted-dr	naive	Title: acutely and recently infected ART-naive persons, western Kenya.
+REF:Kasang|high-prevalence-of-transmitted-drug-resi	naive	Title: therapy-naive patients, Mwanza.
+REF:Boerma|high-levels-of-hiv-drug-resistance-in-tr	naive	Title: treatment-naive children, Lagos.
+PMID:27841669	naive	Title: incident infections, Mbeya 2002-2006; before ART scale-up. Not read.
+PMID:25569444	naive	Title: two HIV-1 recipients from transmission pairs, Rwanda; acute infection. Not read.
+PMID:20643915	naive	Title: tenofovir gel trial (CAPRISA 004) seroconverters; ART-naive, some exposed to the gel. Not read.
+REF:Kamori|emerging-integrase-strand-transfer-inhib	experienced	Title: children and adults on ART, Tanzania 2020-2022.
+PMID:20455758	experienced	Title: children receiving ART, Uganda.
+REF:Zhang|mutational-correlates-of-virological-fai	experienced	Title: virological failure on a TDF-containing first-line regimen.
+REF:Ndembi|viral-rebound-and-emergence-of-drug-resi	experienced	Title: trial of Combivir/nevirapine regimens; sequences from rebound on ART, Uganda 2004-2005.
+PMID:31922120	experienced	Title: virological suppression and resuppression on ART, Ghana; resistance from failures. Not read.
+PMID:26859828	experienced	Title: adults failing early ART in HPTN 052.
+REF:Cheriro|drug-resistance-testing-in-hiv-infected-	mixed	Title: individuals on treatment and naive, Kenya 2011.
+PMID:33119663	mixed	Title: ARV use and resistance in female sex workers, Tanzania; on-ART and off-ART not separated. Not read.
+PMID:17272680	mixed	Abstract checked: paired sequences from 300 subtype C women at baseline and after single-dose nevirapine; baseline naive, post-sdNVP exposed; not separated in deposit.
+PMID:31914792	naive	Abstract checked: Rakai samples 2011-2015 from individuals who did not self-report ART use. Self-reported, not verified.
+PMID:16701907	naive	Abstract checked: all individuals ART naive, South Africa subtype C near full-length genomes.
+REF:Delgado|high-prevalence-of-unique-recombinant-fo	mixed	Abstract checked: 207 Ghanaians from an antiretroviral resistance study; resistance carriers were mostly drug-experienced, so naive and experienced are both present.
+PMID:32492044	mixed	Abstract checked: 13 Zambian seroconverters, ART-naive infection >=2 years then suppressed on ART; sequences span pre-ART and on-ART (reservoir) samples.
+PMID:42166509	experienced	Abstract checked: patients on ART for at least 12 months, Benin 2022, before the dolutegravir era.
+PMID:27458715	naive	Abstract checked: pre-HIV-treatment patients, Harare 2014, HBV/HIV co-infection survey.
+PMID:31107298	naive	Abstract checked: Lagos MSM cohort, sequences from participants within 120 days of diagnosis. ART-naive is implied by timing, not stated.
+REF:Abrahams|the-replication-competent-hiv-1-latent-r	mixed	Abstract checked: nine women on therapy; pre-therapy plasma sequences compared with reservoir viruses sampled on ART.
+PMID:20954909	naive	Abstract checked: uniformed services in Kinshasa, described as putatively antiretroviral-naive.
