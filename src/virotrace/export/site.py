@@ -10,16 +10,34 @@ The limitations are read from the same place as the report's, so the two cannot 
 from __future__ import annotations
 
 import json
+import re
 import shutil
+import unicodedata
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ..curate.study import load_study_annotations
 from ..errors import ContractError
 from ..io.tables import read_tsv
 from ..settings import Settings
+from .africa_map import AFRICA
 from .report import REFERENCES, _read_json, limitations
 from .site_template import PAGE
+
+# GenBank /country names that differ from the Natural Earth names on the outline.
+COUNTRY_ALIASES = {
+    "democratic republic of the congo": "COD", "democratic republic of congo": "COD",
+    "dr congo": "COD", "drc": "COD", "zaire": "COD",
+    "republic of the congo": "COG", "republic of congo": "COG", "congo": "COG",
+    "cote d ivoire": "CIV", "ivory coast": "CIV",
+    "tanzania": "TZA", "united republic of tanzania": "TZA",
+    "swaziland": "SWZ", "eswatini": "SWZ",
+    "central african republic": "CAF", "equatorial guinea": "GNQ",
+    "south sudan": "SSD", "western sahara": "ESH",
+    "sao tome and principe": "STP", "the gambia": "GMB", "gambia": "GMB",
+}  # fmt: skip
 
 
 def _num(value: Any, kind: type = float) -> Any:
@@ -94,6 +112,59 @@ def _gates(results: Path, subtypes: list[str]) -> list[dict[str, Any]]:
     return rows
 
 
+def _norm(name: str) -> str:
+    text = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", text.replace("&", " and "))).strip()
+
+
+def country_ids(strata: list[str]) -> tuple[dict[str, str], list[str]]:
+    """Map GenBank country names to outline ids; names with no outline are returned apart."""
+    lookup = {_norm(n): f["id"] for f in AFRICA["features"] for n in f["names"]}
+    lookup.update(COUNTRY_ALIASES)
+    found: dict[str, str] = {}
+    missing: list[str] = []
+    for name in strata:
+        key = lookup.get(_norm(name))
+        if key:
+            found[name] = key
+        else:
+            missing.append(name)
+    return found, missing
+
+
+def _annotation_coverage(settings: Settings, root: Path) -> dict[str, Any] | None:
+    """Share of QC-passed sequences whose study has a hand-curated treatment context."""
+    interim = root / settings.paths["interim"] / settings.scope
+    passed_path, meta_path = interim / "qc.passed.tsv", interim / "metadata.valid.tsv"
+    if not (passed_path.exists() and meta_path.exists()):
+        return None
+    passed = {r["strain"] for r in read_tsv(passed_path)}
+    ref = root / settings.paths["reference"] / settings.prevalence.study_annotations
+    annotations = load_study_annotations(ref) if ref.exists() else {}
+    by_context: Counter[str] = Counter()
+    studies: set[str] = set()
+    annotated_studies: set[str] = set()
+    for r in read_tsv(meta_path):
+        if r["strain"] not in passed:
+            continue
+        key = r.get("study_key", "") or "unknown_study"
+        studies.add(key)
+        context = annotations.get(key, {}).get("treatment_context")
+        if context:
+            annotated_studies.add(key)
+        by_context[context or "unannotated"] += 1
+    total = sum(by_context.values())
+    if not total:
+        return None
+    return {
+        "n_sequences": total,
+        "n_annotated": total - by_context["unannotated"],
+        "by_context": dict(by_context),
+        "n_studies": len(studies),
+        "n_studies_annotated": len(annotated_studies),
+    }
+
+
 def _copy_trees(settings: Settings, root: Path, out: Path) -> list[dict[str, Any]]:
     """Copy the Auspice JSONs beside the page so they can be downloaded or opened elsewhere."""
     src = root / settings.paths["auspice"]
@@ -129,6 +200,8 @@ def collect(
             raise ContractError(f"{path} not found; run `virotrace {stage}` first")
     prevalence = _prevalence(results)
     versions = {r["list_role"]: r["list_version"] for r in prevalence}
+    countries = sorted({r["stratum"] for r in prevalence if r["stratum_kind"] == "country"})
+    ids, missing = country_ids(countries)
     cl = _read_json(results / "phylo" / "clusters_summary.json")
     st = _read_json(results / "phylo" / "subtype_tree" / "subtype_tree_summary.json")
     return {
@@ -138,6 +211,20 @@ def collect(
         "list_versions": versions,
         "prevalence": prevalence,
         "trends": _trends(results),
+        "map": (
+            {
+                "width": AFRICA["width"],
+                "height": AFRICA["height"],
+                "features": [
+                    {k: f[k] for k in ("id", "name", "d", "cx", "cy")} for f in AFRICA["features"]
+                ],
+            }
+            if ids
+            else None
+        ),
+        "country_ids": ids,
+        "unmapped_countries": missing,
+        "annotation": _annotation_coverage(settings, root),
         "qc": _read_json(results / "qc" / "qc_summary.json"),
         "tree_set": _read_json(results / "qc" / "subsample_summary.json"),
         "clusters": cl,
@@ -188,5 +275,11 @@ def run_site(
         "site": str(out / "index.html"),
         "data": str(out / "data.json"),
         "n_trees": len(trees),
+        "unmapped_countries": data["unmapped_countries"],
+        "annotated_fraction": (
+            round(data["annotation"]["n_annotated"] / data["annotation"]["n_sequences"], 4)
+            if data["annotation"]
+            else None
+        ),
         "bytes": (out / "index.html").stat().st_size,
     }

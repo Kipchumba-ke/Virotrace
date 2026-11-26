@@ -297,3 +297,54 @@ def test_site_without_prevalence_names_the_stage(workspace):
     (tmp / "results/kenya/drm/prevalence.tsv").unlink()
     with pytest.raises(ContractError, match="drm prevalence"):
         run_site(settings, repo_root=tmp)
+
+
+def test_country_names_from_genbank_map_to_the_outline_and_unknowns_are_reported():
+    from virotrace.export.site import country_ids
+
+    names = ["Kenya", "Cote d'Ivoire", "Democratic Republic of the Congo", "Congo",
+             "Tanzania", "Swaziland", "Gambia", "Atlantis"]  # fmt: skip
+    found, missing = country_ids(names)
+    assert found["Kenya"] == "KEN" and found["Cote d'Ivoire"] == "CIV"
+    assert found["Democratic Republic of the Congo"] == "COD" and found["Congo"] == "COG"
+    assert found["Tanzania"] == "TZA" and found["Swaziland"] == "SWZ" and found["Gambia"] == "GMB"
+    assert missing == ["Atlantis"]
+
+
+def test_site_reports_annotation_coverage_by_context_and_embeds_a_map(workspace):
+    from virotrace.export.site import collect
+
+    settings, tmp = workspace
+    interim = tmp / "interim/kenya"
+    write_tsv(interim / "qc.passed.tsv", [{"strain": s, "genes": "pol", "hypermutated": ""}
+                                         for s in "abcde"], ["strain", "genes", "hypermutated"])  # fmt: skip
+    write_tsv(
+        interim / "metadata.valid.tsv",
+        [{"strain": s, "study_key": k} for s, k in zip("abcdef", ["S1", "S1", "S2", "S3", "S4", "S1"], strict=True)],
+        ["strain", "study_key"],
+    )  # fmt: skip
+    (tmp / "study_annotations.tsv").write_text(
+        "study_key\ttreatment_context\tnote\nS1\tnaive\t\nS2\tmixed\t\nS3\tunknown\t\n"
+    )
+    data = collect(settings, tmp)
+    an = data["annotation"]
+    # f is not QC-passed, so it is not counted; S4 has no annotation
+    assert an["n_sequences"] == 5 and an["n_annotated"] == 4
+    assert an["by_context"] == {"naive": 2, "mixed": 1, "unknown": 1, "unannotated": 1}
+    assert an["n_studies"] == 4 and an["n_studies_annotated"] == 3
+    assert data["map"] is None  # the fixture has no country rows
+    write_tsv(
+        tmp / "results/kenya/drm/prevalence.tsv",
+        [_row("country", "Kenya", "NRTI", 25, 100), _row("country", "Atlantis", "NRTI", 1, 50)],
+        PREV,
+    )
+    data = collect(settings, tmp)
+    assert data["country_ids"] == {"Kenya": "KEN"} and data["unmapped_countries"] == ["Atlantis"]
+    assert {f["id"] for f in data["map"]["features"]} >= {"KEN", "UGA", "ZAF", "NGA"}
+
+
+def test_site_annotation_coverage_is_absent_without_interim_tables(workspace):
+    from virotrace.export.site import collect
+
+    settings, tmp = workspace
+    assert collect(settings, tmp)["annotation"] is None

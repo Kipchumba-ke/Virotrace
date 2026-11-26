@@ -83,6 +83,14 @@ ol.lim li{margin:.4rem 0}
 .legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.85rem;margin:.5rem 0}
 .legend i{display:inline-block;width:.75rem;height:.75rem;border-radius:2px;margin-right:.35rem;vertical-align:-.05rem}
 footer{border-top:1px solid var(--border);padding:1.6rem 0 3rem;color:var(--muted);font-size:.85rem}
+#mapCard .maprow{display:grid;grid-template-columns:minmax(260px,560px) 1fr;gap:1.2rem;align-items:start}
+@media (max-width:760px){#mapCard .maprow{grid-template-columns:1fr}}
+.mapsvg{width:100%;height:auto;max-height:640px;display:block}
+.mapsvg path{stroke:#fff;stroke-width:.8;cursor:pointer;transition:opacity .1s}
+.mapsvg path:hover{opacity:.82} .mapsvg path:focus-visible{outline:none;stroke:#101D2D;stroke-width:2.2}
+.mapsvg path.sel{stroke:#101D2D;stroke-width:2.4}
+.ramp{height:10px;border-radius:5px;border:1px solid var(--border)}
+.swatch{display:inline-block;width:.8rem;height:.8rem;border-radius:2px;vertical-align:-.1rem;margin-right:.35rem;border:1px solid var(--border)}
 @media print{nav.bar,.controls,.btn{display:none}}
 </style></head>
 <body>
@@ -119,6 +127,7 @@ footer{border-top:1px solid var(--border);padding:1.6rem 0 3rem;color:var(--mute
       <div class="tablewrap"><table id="matrix"></table></div>
     </div>
     <div class="card" id="trendCard" style="margin-top:1rem"></div>
+    <div class="card" id="mapCard" style="margin-top:1rem"></div>
   </section>
 
   <section id="clusters">
@@ -184,6 +193,8 @@ $('#title').textContent=scope+' HIV-1 drug resistance and lineage explorer';
   if(ts){var wf=ts.waterfall||{};var n=wf.after_neighbour_screen!=null?wf.after_neighbour_screen:wf.retained;
     if(n!=null)t.push(['Tree set',fmt(n),'strictly dated individuals'])}
   if(cl&&cl.proportion_clustered!=null)t.push(['In a cluster',pct(cl.proportion_clustered),fmt(cl.n_clusters)+' clusters']);
+  var an=D.annotation;
+  if(an&&an.n_sequences)t.push(['Treatment context known',pct(an.n_annotated/an.n_sequences),fmt(an.n_studies_annotated)+' of '+fmt(an.n_studies)+' studies annotated']);
   var head=D.prevalence.filter(function(r){return r.list_role==='headline'&&r.stratum_kind==='overall'&&r.status==='estimated'});
   if(head.length){var m=head.reduce(function(a,b){return b.denominator>a.denominator?b:a});
     t.push(['Largest overall denominator',fmt(m.denominator),m.drug_class+' on the WHO 2009 list'])}
@@ -273,7 +284,47 @@ function drawExplorer(){
     var a=Math.min(0.55,r.proportion*1.6);
     return '<td class="n" style="background:rgba(19,184,166,'+a.toFixed(2)+')">'+pct(r.proportion)+' <span class="muted">'+fmt(r.numerator)+'/'+fmt(r.denominator)+'</span></td>'}).join('')+'</tr>'}).join('')+'</tbody>';
   $('#matrix').innerHTML=head+body;
-  drawTrends();
+  drawTrends();drawMap();
+}
+
+/* ---------- country map ---------- */
+function lerp(a,b,t){var h=function(x,i){return parseInt(x.slice(1+2*i,3+2*i),16)};
+  return 'rgb('+[0,1,2].map(function(i){return Math.round(h(a,i)+(h(b,i)-h(a,i))*t)}).join(',')+')'}
+var mapState={metric:'p',sel:null};
+function drawMap(){
+  var el=$('#mapCard'),M=D.map;
+  if(!M){el.style.display='none';return}
+  el.style.display='';
+  var rows=D.prevalence.filter(function(r){return r.list_role===st.role&&r.stratum_kind==='country'&&r.drug_class===st.cls});
+  var byId={};rows.forEach(function(r){var id=D.country_ids[r.stratum];if(id)byId[id]=r});
+  var est=Object.keys(byId).map(function(k){return byId[k]}).filter(function(r){return r.status==='estimated'});
+  var maxP=Math.max.apply(null,[0.05].concat(est.map(function(r){return r.proportion}))),
+      maxN=Math.max.apply(null,[1].concat(Object.keys(byId).map(function(k){return byId[k].denominator||0})));
+  var isP=mapState.metric==='p';
+  function fill(f){var r=byId[f.id];if(!r)return '#EAF0F5';
+    if(isP){if(r.status!=='estimated')return 'url(#hatch)';return lerp('#E3F6F3','#0A6A60',Math.min(1,r.proportion/maxP))}
+    return lerp('#E4ECF2','#173B4D',Math.log(1+(r.denominator||0))/Math.log(1+maxN))}
+  function label(f){var r=byId[f.id];if(!r)return f.name+': no sequences in this grouping';
+    if(r.status!=='estimated')return f.name+': suppressed, n='+fmt(r.denominator);
+    return f.name+': '+pct(r.proportion)+' ('+pct(r.ci_low)+' to '+pct(r.ci_high)+'), '+fmt(r.numerator)+'/'+fmt(r.denominator)}
+  var svg='<svg class="mapsvg" viewBox="0 0 '+M.width+' '+M.height+'" role="group" aria-label="Map of Africa shaded by '+(isP?esc(st.cls)+' prevalence':'sequence count')+'"><defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#EFEDFF"/><line x1="0" y1="0" x2="0" y2="7" stroke="#8B7BE8" stroke-width="2"/></pattern></defs>';
+  M.features.forEach(function(f){
+    svg+='<path d="'+f.d+'" data-id="'+esc(f.id)+'" fill="'+fill(f)+'" class="'+(mapState.sel===f.id?'sel':'')+'" tabindex="0" role="button" aria-label="'+esc(label(f))+'"><title>'+esc(label(f))+'</title></path>'});
+  svg+='</svg>';
+  var legend=isP
+    ?'<div class="ramp" style="background:linear-gradient(90deg,#E3F6F3,#0A6A60)"></div><div style="display:flex;justify-content:space-between;font-size:.8rem" class="muted"><span>0%</span><span>'+pct(maxP,0)+'</span></div><p class="note"><span class="swatch" style="background:repeating-linear-gradient(45deg,#8B7BE8 0 2px,#EFEDFF 2px 5px)"></span>suppressed (small group) &nbsp; <span class="swatch" style="background:#EAF0F5"></span>no sequences</p>'
+    :'<div class="ramp" style="background:linear-gradient(90deg,#E4ECF2,#173B4D)"></div><div style="display:flex;justify-content:space-between;font-size:.8rem" class="muted"><span>1</span><span>'+fmt(maxN)+' (log scale)</span></div><p class="note"><span class="swatch" style="background:#EAF0F5"></span>no sequences</p>';
+  var sel=mapState.sel&&M.features.filter(function(f){return f.id===mapState.sel})[0],detail='<p class="note">Click a country for its estimates in every class.</p>';
+  if(sel){var nm=sel.name;var allr=D.prevalence.filter(function(r){return r.list_role===st.role&&r.stratum_kind==='country'&&D.country_ids[r.stratum]===sel.id});
+    detail='<h3 style="margin:.2rem 0;font-size:1rem">'+esc(nm)+'</h3>'+(allr.length?'<table><tbody>'+classes.map(function(c){var r=allr.filter(function(x){return x.drug_class===c})[0];
+      return '<tr><td><span class="swatch" style="background:'+COLOR[c]+'"></span>'+c+'</td><td class="n">'+(!r?'not assessed':r.status!=='estimated'?'suppressed (n='+fmt(r.denominator)+')':pct(r.proportion)+' <span class="muted">('+pct(r.ci_low)+'\u2013'+pct(r.ci_high)+') '+fmt(r.numerator)+'/'+fmt(r.denominator)+'</span>')+'</td></tr>'}).join('')+'</tbody></table>':'<p class="note">No sequences from this country in the corpus.</p>')}
+  var miss=D.unmapped_countries&&D.unmapped_countries.length?'<p class="note">Not on the map (no outline for the name): '+esc(D.unmapped_countries.join(', '))+'. They are in the table above.</p>':'';
+  el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:.6rem 1.2rem;justify-content:space-between;align-items:center"><h3 style="margin:.1rem 0;font-size:1rem">Map by country</h3><div class="seg" id="mapSeg" role="group" aria-label="Map shading"><button type="button" data-m="p" aria-pressed="'+isP+'">Prevalence</button><button type="button" data-m="n" aria-pressed="'+!isP+'">Sequences</button></div></div>'+
+    '<p class="note" style="margin-top:.3rem">Uses the mutation list and drug class chosen above ('+esc(ROLE_LABEL[st.role]||st.role)+', '+esc(st.cls)+'). Shading is the proportion with an SDRM; read it beside the sequence count, because a dark country with few sequences is an uncertain estimate. Prevalence describes deposited sequences, not the epidemic.</p>'+
+    '<div class="maprow"><div>'+svg+'</div><div>'+legend+detail+miss+'</div></div>';
+  $('#mapSeg').addEventListener('click',function(e){var b=e.target.closest('button');if(b){mapState.metric=b.dataset.m;drawMap()}});
+  var pick=function(e){var p=e.target.closest('path');if(!p)return;if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();mapState.sel=p.dataset.id;drawMap();var q=$('#mapCard path[data-id="'+p.dataset.id+'"]');if(q)q.focus()};
+  el.querySelector('svg').addEventListener('click',pick);el.querySelector('svg').addEventListener('keydown',pick);
 }
 function pText(p){return p==null?'':p===0?'< 1e-300':String(p)}
 function drawTrends(){
@@ -335,6 +386,10 @@ function columns(title,pairs,color){
     out+=columns('Tree set by collection year',yrs,'#38BDF8');
     var ns=ts.neighbour_screen&&ts.neighbour_screen.removed||[];
     if(ns.length)out+='<div class="card"><h3 style="margin:.1rem 0 .4rem;font-size:1rem">Neighbour screen</h3><p class="note" style="margin:0">'+ns.length+' sequences were left out of the tree because no other sequence is within the identity floor of '+pct(ts.neighbour_screen.threshold,0)+' over shared sites. They remain in the resistance prevalence.</p></div>'}
+  var an=D.annotation;
+  if(an){var order=[['naive','#13B8A6'],['experienced','#173B4D'],['mixed','#8B7BE8'],['unknown','#38BDF8'],['unannotated','#DCE5EC']],bc=an.by_context||{},x=0,bar='';
+    order.forEach(function(o){var w=520*(bc[o[0]]||0)/an.n_sequences;bar+='<rect x="'+x+'" y="0" width="'+w+'" height="24" fill="'+o[1]+'"><title>'+o[0]+': '+fmt(bc[o[0]]||0)+'</title></rect>';x+=w});
+    out+='<div class="card"><h3 style="margin:.1rem 0 .5rem;font-size:1rem">Treatment-context annotation</h3><p class="note" style="margin-top:0"><strong>'+pct(an.n_annotated/an.n_sequences)+'</strong> of '+fmt(an.n_sequences)+' QC-passed sequences ('+fmt(an.n_studies_annotated)+' of '+fmt(an.n_studies)+' studies) have a hand-curated treatment context.</p><svg class="chart" viewBox="0 0 520 24" role="img" aria-label="Sequences by study treatment context">'+bar+'</svg><div class="legend">'+order.map(function(o){return '<span><i style="background:'+o[1]+'"></i>'+o[0]+' '+fmt(bc[o[0]]||0)+'</span>'}).join('')+'</div><p class="note" style="margin-bottom:0">Contexts come from reading each study, never from mutations. Mixed and unknown studies are annotated but not placed in the naive or experienced strata; unannotated sequences are left out of treatment strata.</p></div>'}
   $('#dataBody').innerHTML=out||'<p class="note">Not generated for this build.</p>';
 })();
 
