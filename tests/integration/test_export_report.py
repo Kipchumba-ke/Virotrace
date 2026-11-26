@@ -250,3 +250,50 @@ def test_tree_set_section_names_tips_dropped_by_the_neighbour_screen(workspace):
     assert "58 individuals with strictly dated sequences" in html
     assert "2 sequences were left out of the tree" in html and "KP223764.1, KT183251.1" in html
     assert "86%" in html and "remain in the resistance prevalence" in html
+
+
+def test_site_is_one_page_with_aggregate_data_palette_and_every_limitation(workspace):
+    from virotrace.export.site import run_site
+
+    settings, tmp = workspace
+    (tmp / "auspice").mkdir()
+    (tmp / "auspice/virotrace_kenya.json").write_text("{}")
+    (tmp / "auspice/virotrace_kenya_A1.json").write_text("{}")
+    summary = run_site(settings, repo_root=tmp, base_url="https://example.org/virotrace/")
+    page = (tmp / "reports/kenya/site/index.html").read_text()
+    data = json.loads((tmp / "reports/kenya/site/data.json").read_text())
+    assert summary["n_trees"] == 2 and summary["site"].endswith("site/index.html")
+    assert (tmp / "reports/kenya/site/trees/virotrace_kenya_A1.json").exists()
+    assert {t["label"] for t in data["trees"]} == {"pooled", "A1"}
+    assert data["trees"][0]["nextstrain"].startswith("https://nextstrain.org/fetch/example.org/")
+    # the page carries the palette, the headline numbers and the whole limitations list
+    assert "#101D2D" in page and "#13B8A6" in page and "#8B7BE8" in page
+    assert len(data["limitations"]) == len(limitations(tmp)) and "Not a clinical tool" in page
+    assert any(r["proportion"] == 0.25 and r["denominator"] == 100 for r in data["prevalence"])
+    assert data["clusters"]["sdrm_cluster_odds_ratio_adjusted_for_study"]["odds_ratio"] == 1.12
+    # one data block and one script: nothing in the data can end the block early
+    assert (
+        page.count("</script>") == 2
+        and "http://" not in page.split('<script id="virotrace-data"')[0]
+    )
+    # aggregate only: no per-sequence identifiers leave the pipeline
+    assert "strain" not in data["prevalence"][0] and "accession" not in json.dumps(data)
+
+
+def test_site_escapes_script_terminators_inside_the_data(workspace):
+    from virotrace.export.site import collect, render
+
+    settings, tmp = workspace
+    data = collect(settings, tmp)
+    data["limitations"].append("bad </script><script>alert(1)</script> <!-- text")
+    page = render(data)
+    assert page.count("</script>") == 2 and "<script>alert(1)" not in page
+
+
+def test_site_without_prevalence_names_the_stage(workspace):
+    from virotrace.export.site import run_site
+
+    settings, tmp = workspace
+    (tmp / "results/kenya/drm/prevalence.tsv").unlink()
+    with pytest.raises(ContractError, match="drm prevalence"):
+        run_site(settings, repo_root=tmp)

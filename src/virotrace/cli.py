@@ -398,6 +398,30 @@ def export_report(
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
+@export_app.command("site")
+def export_site(
+    config: ConfigOpt = Path("config/config.yaml"),
+    profile: ProfileOpt = None,
+    base_url: Annotated[
+        str | None,
+        typer.Option(
+            "--base-url",
+            help="Public address the site will be served from; adds nextstrain.org links to trees.",
+        ),
+    ] = None,
+) -> None:
+    """L4: the interactive explorer, one static page over the aggregate results."""
+    from .export.site import run_site
+
+    settings = load_settings(config, profile)
+    try:
+        summary = run_site(settings, base_url=base_url)
+    except (ConfigError, ContractError) as exc:
+        _fail(exc)
+        return
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+
+
 def main() -> None:
     app()
 

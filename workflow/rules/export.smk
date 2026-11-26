@@ -62,3 +62,16 @@ rule export_report:
         f"logs/{SCOPE}/export_report.log",
     shell:
         "virotrace export report {CONFIG_ARGS} > {log} 2>&1"
+
+
+rule export_site:
+    """The interactive explorer: one static page over the aggregate tables."""
+    input:
+        report=rules.export_report.output.report,
+        clusters=rules.clusters.output.clusters if PHYLO_ENABLED else [],
+    output:
+        site=f"{PATHS['reports']}/{SCOPE}/site/index.html",
+    log:
+        f"logs/{SCOPE}/export_site.log",
+    shell:
+        "virotrace export site {CONFIG_ARGS} > {log} 2>&1"
