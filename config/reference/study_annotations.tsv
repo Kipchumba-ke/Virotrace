@@ -163,3 +163,20 @@ PMID:31107298	naive	Abstract checked: Lagos MSM cohort, sequences from participa
 REF:Abrahams|the-replication-competent-hiv-1-latent-r	mixed	Abstract checked: nine women on therapy; pre-therapy plasma sequences compared with reservoir viruses sampled on ART.
 PMID:20954909	naive	Abstract checked: uniformed services in Kinshasa, described as putatively antiretroviral-naive.
 PMID:20660209	naive	Abstract checked: DBS from newly diagnosed HIV-1-infected individuals, Malawi and Tanzania 2005-2006 (the ART-patient samples were China and Cameroon, which this key does not contain). Newly diagnosed, not verified ART-naive.
+REF:Teto|direct-submission	mixed	Authors Teto, Kanmogne, Fokam; submitted Sep 2016 from Nebraska; matches Teto et al. Sci Rep 2017 (141 Yaounde sequences, treatment-naive and on-ART patients). Abstract checked.
+REF:Smeti|direct-submission	naive	Tunisia 2020-2023, n=77 matches Smeti et al. 2026 (77 ART-naive patients). Matched by surname, country and count; author list not checked.
+REF:Van|direct-submission	mixed	Three submissions share this key. 317 records (NCI, Mar 2017) match Van Zyl et al. JCI 2017: 10 children, longitudinal pre-ART and on-ART samples. 148 records (Tygerberg, Nov 2016; Van Zyl, Rhee, Shafer, Engelbrecht) and a few 2011 records are unidentified. Mixed is the conservative label.
+PMID:27836020	mixed	Title: pre-treatment resistance and treatment failure in Nigerian children. Not read.
+REF:Tchiakpe|moderate-rate-of-resistance-mutations-tr	naive	Title: newly diagnosed patients, Benin 2017. Not read.
+REF:Pillay|drug-resistance-in-children-with-virolog	experienced	Title: children with virological failure on first-line ART, KwaZulu-Natal. Not read.
+REF:Maruapula|use-of-a-mutation-specific-genotyping-me	naive	Title: ART-naive subtype C patients, Botswana. Not read.
+REF:Yeshitela|magnitude-and-patterns-of-hiv-1-pol-gene	mixed	Title: newly diagnosed and virologically failing patients, Ethiopia. Not read.
+PMID:18593350	naive	Title: treatment-naive patients, Cape Town. Not read.
+REF:Van|antiretroviral-resistance-mutations-in-p	experienced	Title: prolonged failure on ART, Tygerberg Family Clinic. Not read.
+PMID:21817951	mixed	Title: drug-naive and first-line treatment-failing children, Cameroon. Not read.
+PMID:18575198	naive	Title: drug-naive individuals, Gauteng surveillance 2002 and 2004. Not read.
+PMID:19460333	naive	Title: genotypic resistance mutations in ARV-naive patients, Togo. Not read.
+REF:Caron|increasing-hiv-1-polymorphism-diversity-	naive	Title: untreated pregnant women, Gabon 2008. Not read.
+PMID:22443282	experienced	Title: adults failing ART, Rakai. Not read.
+PMID:30871487	experienced	Title: heavily-treated patients switching from first- to second-line, Cameroon. Not read.
+PMID:30562356	naive	Title: acute and early infected MSM, coastal Kenya. Not read.
