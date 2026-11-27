@@ -268,6 +268,9 @@ def test_site_is_one_page_with_aggregate_data_palette_and_every_limitation(works
     assert data["trees"][0]["nextstrain"].startswith("https://nextstrain.org/fetch/example.org/")
     # the page carries the palette, the headline numbers and the whole limitations list
     assert "#101D2D" in page and "#13B8A6" in page and "#8B7BE8" in page
+    # the in-page tree viewer reads the same Auspice JSON the trees list points at
+    assert "function treeViewer()" in page and "Tree viewer" in page and "fetch(t.file)" in page
+    assert data["trees"][0]["file"].startswith("trees/")
     assert len(data["limitations"]) == len(limitations(tmp)) and "Not a clinical tool" in page
     assert any(r["proportion"] == 0.25 and r["denominator"] == 100 for r in data["prevalence"])
     assert data["clusters"]["sdrm_cluster_odds_ratio_adjusted_for_study"]["odds_ratio"] == 1.12

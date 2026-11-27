@@ -91,6 +91,17 @@ footer{border-top:1px solid var(--border);padding:1.6rem 0 3rem;color:var(--mute
 .mapsvg path.sel{stroke:#101D2D;stroke-width:2.4}
 .ramp{height:10px;border-radius:5px;border:1px solid var(--border)}
 .swatch{display:inline-block;width:.8rem;height:.8rem;border-radius:2px;vertical-align:-.1rem;margin-right:.35rem;border:1px solid var(--border)}
+.tvbar{display:flex;flex-wrap:wrap;gap:.6rem .9rem;align-items:flex-end;margin-bottom:.7rem}
+.tvbar input[type=search]{font:inherit;padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;width:11rem}
+.tvbar .btn{padding:.4rem .7rem}
+.tvwrap{position:relative;border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden}
+#tvCanvas{display:block;width:100%;height:640px;cursor:grab;touch-action:none}
+#tvCanvas.drag{cursor:grabbing}
+#tvTip{position:absolute;pointer-events:none;background:var(--navy);color:#fff;border-radius:6px;padding:.4rem .6rem;font-size:.8rem;line-height:1.35;max-width:300px;display:none;z-index:2}
+#tvTip b{font-family:var(--mono);font-weight:600}
+.legend button{font:inherit;border:1px solid transparent;background:transparent;color:inherit;border-radius:999px;padding:.1rem .5rem;cursor:pointer}
+.legend button:hover{background:var(--surface-2)} .legend button[aria-pressed=true]{border-color:var(--navy);background:var(--surface-2)}
+#tvPin table{margin-top:.5rem}
 @media print{nav.bar,.controls,.btn{display:none}}
 </style></head>
 <body>
@@ -395,7 +406,7 @@ function columns(title,pairs,color){
 
 /* ---------- trees ---------- */
 (function(){
-  var el=$('#treeBody'),out='';
+  var el=$('#treeBody'),out='<div class="card" id="tv" style="margin-bottom:1rem"></div>';
   if(D.gates&&D.gates.length){
     out+='<div class="card"><h3 style="margin:.1rem 0 .3rem;font-size:1rem">Temporal signal</h3><div class="tablewrap" style="max-height:none"><table><thead><tr><th>Tree</th><th>Tips</th><th>Slope</th><th>R\u00B2</th><th>Permutation p</th><th>Gate</th><th>Shown as</th></tr></thead><tbody>'+
       D.gates.map(function(g){return '<tr><td>'+esc(g.label)+'</td><td class="n">'+fmt(g.n)+'</td><td class="n">'+esc(g.slope==null?'':Number(g.slope).toPrecision(3))+'</td><td class="n">'+esc(g.r_squared==null?'':Number(g.r_squared).toFixed(3))+'</td><td class="n">'+esc(g.permutation_p==null?'':g.permutation_p)+'</td><td>'+(g.passed?'pass':'fail')+'</td><td>'+esc(g.result)+'</td></tr>'}).join('')+'</tbody></table></div><p class="note" style="margin-bottom:0">Root-to-tip regression at the best root with a date-randomisation test. A tree that fails is shown as a midpoint-rooted divergence tree.</p></div>'}
@@ -407,8 +418,179 @@ function columns(title,pairs,color){
   if(D.trees&&D.trees.length){
     out+='<div class="card" style="margin-top:1rem"><h3 style="margin:.1rem 0 .3rem;font-size:1rem">Interactive trees (Auspice)</h3><p class="note" style="margin-top:0">Download a file and drop it on <a href="https://auspice.us" rel="noopener">auspice.us</a>; the file is read in your browser and not uploaded. Colourings include resistance by class, subtype, country and treatment context.</p><div class="tablewrap" style="max-height:none"><table><thead><tr><th>Tree</th><th>File</th><th>Size</th><th></th></tr></thead><tbody>'+
       D.trees.map(function(t){return '<tr><td>'+esc(t.label)+'</td><td><a href="'+esc(t.file)+'" download>'+esc(t.name)+'</a></td><td class="n">'+(t.bytes/1048576).toFixed(1)+' MB</td><td>'+(t.nextstrain?'<a href="'+esc(t.nextstrain)+'" rel="noopener">Open on nextstrain.org</a>':'')+'</td></tr>'}).join('')+'</tbody></table></div></div>'}
-  el.innerHTML=out||'<p class="note">Not generated for this build.</p>';
+  el.innerHTML=out;
 })();
+
+
+/* ---------- tree viewer: reads an Auspice v2 JSON, draws it on a canvas ---------- */
+var TV_PALETTE=['#13B8A6','#8B7BE8','#38BDF8','#F59E0B','#E5566D','#173B4D','#7ACBBF','#B7ABF2','#8ED3F7','#F7C46A','#EE9AA7','#5C7A8C'];
+var TV_FIXED={yes:'#8B7BE8',no:'#AEBBC8',unknown:'#CBD5E1',unannotated:'#CBD5E1',unclustered:'#CBD5E1',none:'#CBD5E1',unassigned:'#CBD5E1','?':'#CBD5E1'};
+var TV_SUBTYPE={C:'#13B8A6',A1:'#38BDF8',D:'#8B7BE8',G:'#173B4D',CRF02_AG:'#F59E0B',B:'#E5566D',F1:'#7ACBBF',CRF01_AE:'#B7ABF2'};
+function treeViewer(){
+  var host=$('#tv');if(!host)return;
+  var treeOpts=(D.trees||[]).map(function(t,i){return '<option value="'+i+'">'+esc(t.label)+'</option>'}).join('');
+  host.innerHTML='<h3 style="margin:.1rem 0 .3rem;font-size:1rem">Tree viewer</h3>'+
+    '<p class="note" style="margin-top:0">Draws an Auspice tree here, with no download. Scroll to zoom the rows, Shift+scroll to zoom the branches, drag to pan, click a tip to pin its details. Internal branches are coloured only for reconstructed traits.</p>'+
+    '<div class="tvbar">'+(treeOpts?'<div class="ctl"><label for="tvTree">Tree</label><select id="tvTree">'+treeOpts+'</select></div><div class="ctl"><button class="btn" id="tvLoad" type="button">Load tree</button></div>':'')+
+    '<div class="ctl"><label for="tvFile">'+(treeOpts?'or a file':'Auspice JSON file')+'</label><input id="tvFile" type="file" accept=".json,application/json"></div>'+
+    '<div class="ctl"><label for="tvColor">Colour by</label><select id="tvColor" disabled></select></div>'+
+    '<div class="ctl"><span class="lab">Axis</span><div class="seg" id="tvAxis" role="group" aria-label="Axis"><button type="button" data-a="div" aria-pressed="true">Divergence</button><button type="button" data-a="date" aria-pressed="false">Date</button></div></div>'+
+    '<div class="ctl"><label for="tvSearch">Find a tip</label><input id="tvSearch" type="search" placeholder="accession"></div>'+
+    '<div class="ctl"><button class="btn ghost" id="tvFit" type="button">Fit</button></div></div>'+
+    '<div class="tvwrap"><canvas id="tvCanvas" role="img" aria-label="Phylogenetic tree"></canvas><div id="tvTip"></div></div>'+
+    '<div class="legend" id="tvLegend"></div><div id="tvPin"></div><p class="note" id="tvMsg">No tree loaded.</p>';
+  var cv=$('#tvCanvas'),ctx=cv.getContext('2d'),tip=$('#tvTip');
+  var V={nodes:[],leaves:[],meta:null,axis:'div',key:null,cs:null,hl:null,found:null,pin:null,kx:1,ky:1,tx:0,ty:0,xr:[0,1],hasDate:false,hover:null};
+  var M={l:14,r:14,t:10,b:30};
+  function msg(t){$('#tvMsg').textContent=t}
+  function val(n,k){var a=n.node_attrs&&n.node_attrs[k];return a==null?undefined:(typeof a==='object'?a.value:a)}
+
+  function setTree(json){
+    var root=json.tree||json,nodes=[],leaves=[],st=[root];root._p=null;
+    while(st.length){var n=st.pop();nodes.push(n);var ch=n.children;
+      if(ch&&ch.length){for(var i=ch.length-1;i>=0;i--){ch[i]._p=n;st.push(ch[i])}}else{n._leaf=leaves.length;leaves.push(n)}}
+    // rows: leaves in order, internal nodes at the mean of first and last child (children come before parents when reversed)
+    for(var j=nodes.length-1;j>=0;j--){var m=nodes[j];
+      if(m._leaf!=null)m._y=m._leaf;else m._y=(m.children[0]._y+m.children[m.children.length-1]._y)/2;
+      m._xd=val(m,'div');var d=m.node_attrs&&m.node_attrs.num_date;m._xt=d==null?undefined:(typeof d==='object'?d.value:d)}
+    nodes.forEach(function(m){var p=m._p;if(m._xd==null)m._xd=p?p._xd:0;if(m._xt==null)m._xt=p?p._xt:undefined});
+    V.nodes=nodes;V.leaves=leaves;V.meta=json.meta||{};V.found=null;V.pin=null;V.hl=null;
+    V.hasDate=leaves.some(function(l){return l._xt!=null});
+    var segBtns=$('#tvAxis').querySelectorAll('button');segBtns[1].disabled=!V.hasDate;
+    V.axis=V.hasDate&&/time tree/i.test(V.meta.title||'')?'date':'div';
+    syncAxis();
+    var cols=(V.meta.colorings||[]).filter(function(c){return leaves.some(function(l){return val(l,c.key)!=null})});
+    var sel=$('#tvColor');sel.innerHTML=cols.map(function(c){return '<option value="'+esc(c.key)+'">'+esc(c.title||c.key)+'</option>'}).join('');sel.disabled=!cols.length;
+    var def=(V.meta.display_defaults||{}).color_by;V.key=cols.some(function(c){return c.key===def})?def:(cols[0]&&cols[0].key);if(V.key)sel.value=V.key;
+    buildScale();fit();
+    msg((V.meta.title||'Tree')+': '+fmt(leaves.length)+' tips.');
+  }
+  function syncAxis(){$('#tvAxis').querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.a===V.axis))});
+    var f=V.axis==='date'?'_xt':'_xd',lo=Infinity,hi=-Infinity;
+    V.nodes.forEach(function(n){var x=n[f];if(x!=null){if(x<lo)lo=x;if(x>hi)hi=x}});
+    if(!(hi>lo)){lo=0;hi=1}V.xr=[lo,hi];V.xf=f}
+  function buildScale(){
+    var k=V.key;if(!k){V.cs=null;renderLegend();return}
+    var meta=(V.meta.colorings||[]).filter(function(c){return c.key===k})[0]||{},counts={};
+    V.leaves.forEach(function(l){var v=val(l,k);if(v!=null){counts[v]=(counts[v]||0)+1}});
+    var keys=Object.keys(counts);
+    if(meta.type==='ordinal'||meta.type==='continuous'){
+      var nums=keys.map(Number).filter(function(x){return !isNaN(x)}),lo=Math.min.apply(null,nums),hi=Math.max.apply(null,nums);
+      V.cs={ord:true,lo:lo,hi:hi,color:function(v){var x=Number(v);if(isNaN(x))return '#CBD5E1';return lerp('#BFEFE9','#101D2D',hi>lo?(x-lo)/(hi-lo):.5)}};
+    }else{
+      keys.sort(function(a,b){return counts[b]-counts[a]});var map={},pi=0,fixedUsed=0;
+      keys.forEach(function(v,i){
+        if(k==='subtype'&&TV_SUBTYPE[v])map[v]=TV_SUBTYPE[v];
+        else if(TV_FIXED[String(v).toLowerCase()])map[v]=TV_FIXED[String(v).toLowerCase()];
+        else if(pi<TV_PALETTE.length){map[v]=TV_PALETTE[pi++]}
+        else map[v]='#94A3B8'});
+      V.cs={ord:false,counts:counts,keys:keys,map:map,other:keys.filter(function(v){return map[v]==='#94A3B8'}).length,
+        color:function(v){return map[v]||'#CBD5E1'}};
+    }
+    renderLegend();
+  }
+  function renderLegend(){
+    var el=$('#tvLegend'),cs=V.cs;if(!cs){el.innerHTML='';return}
+    if(cs.ord){el.innerHTML='<span>'+esc(cs.lo)+'</span><span class="ramp" style="width:180px;background:linear-gradient(90deg,#BFEFE9,#101D2D)"></span><span>'+esc(cs.hi)+'</span>';return}
+    var shown=cs.keys.filter(function(v){return cs.map[v]!=='#94A3B8'}).slice(0,16);
+    el.innerHTML=shown.map(function(v){return '<button type="button" data-v="'+esc(v)+'" aria-pressed="'+(V.hl===v)+'"><i style="background:'+cs.map[v]+'"></i>'+esc(v)+' <span class="muted">'+fmt(cs.counts[v])+'</span></button>'}).join('')+(cs.other?'<span class="muted" style="font-size:.8rem">+ '+cs.other+' more values in grey</span>':'');
+  }
+  $('#tvLegend').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;V.hl=V.hl===b.dataset.v?null:b.dataset.v;renderLegend();draw()});
+  $('#tvColor').addEventListener('change',function(e){V.key=e.target.value;V.hl=null;buildScale();draw()});
+  $('#tvAxis').addEventListener('click',function(e){var b=e.target.closest('button');if(!b||b.disabled)return;V.axis=b.dataset.a;syncAxis();draw()});
+  $('#tvFit').addEventListener('click',function(){fit()});
+  $('#tvSearch').addEventListener('input',function(e){
+    var q=e.target.value.trim().toLowerCase();V.found=null;
+    if(q.length>=3){var hit=V.leaves.filter(function(l){return String(l.name).toLowerCase().indexOf(q)>=0});
+      V.found=hit.length?hit:null;msg(hit.length?fmt(hit.length)+' tips match.':'No tip matches.');
+      if(hit.length===1){var H=cv.clientHeight,rowH=(H-M.t-M.b)/V.leaves.length;V.ky=Math.max(V.ky,Math.min(40,24/rowH));V.ty=(H/2)-(M.t+hit[0]._y*rowH*V.ky)}}
+    draw()});
+  function fit(){V.kx=1;V.ky=1;V.tx=0;V.ty=0;resize();}
+  function resize(){var r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);draw()}
+  window.addEventListener('resize',function(){if(V.nodes.length)resize()});
+
+  function geom(){var W=cv.clientWidth,H=cv.clientHeight,rowH=(H-M.t-M.b)/Math.max(1,V.leaves.length),pw=W-M.l-M.r;
+    return {W:W,H:H,rowH:rowH,pw:pw,
+      sx:function(x){return M.l+(x-V.xr[0])/(V.xr[1]-V.xr[0])*pw*V.kx+V.tx},
+      ix:function(px){return V.xr[0]+(px-V.tx-M.l)/(pw*V.kx)*(V.xr[1]-V.xr[0])},
+      sy:function(y){return M.t+y*rowH*V.ky+V.ty}}}
+  function niceStep(span,n){var raw=span/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return (f<1.5?1:f<3?2:f<7?5:10)*p}
+  function draw(){
+    if(!V.nodes.length){var c0=cv.getContext('2d'),dpr0=window.devicePixelRatio||1;c0.setTransform(dpr0,0,0,dpr0,0,0);c0.clearRect(0,0,cv.clientWidth,cv.clientHeight);c0.fillStyle='#64748B';c0.font='14px sans-serif';c0.fillText('Load a tree to see it here.',20,34);return}
+    var g=geom(),dpr=cv.width/cv.clientWidth,f=V.xf;
+    ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,g.W,g.H);ctx.lineCap='round';
+    var rowPx=g.rowH*V.ky,cs=V.cs,dim=V.hl!=null,key=V.key;
+    function colorOf(n){if(!cs||!key)return '#8FA1B3';var v=val(n,key);return v==null?null:cs.color(v)}
+    function match(n){if(!dim)return true;return String(val(n,key))===V.hl}
+    // pass 1: structure, neutral
+    ctx.strokeStyle='#A7B5C3';ctx.lineWidth=1;ctx.beginPath();
+    var nodes=V.nodes;
+    for(var i=0;i<nodes.length;i++){var n=nodes[i];if(n._leaf!=null)continue;
+      var x=g.sx(n[f]),y1=g.sy(n.children[0]._y),y2=g.sy(n.children[n.children.length-1]._y);
+      if(y2<-4||y1>g.H+4)continue;
+      ctx.moveTo(x,y1);ctx.lineTo(x,y2);
+      for(var c=0;c<n.children.length;c++){var ch=n.children[c];if(ch._leaf!=null)continue;var cy=g.sy(ch._y);if(cy<-4||cy>g.H+4)continue;ctx.moveTo(x,cy);ctx.lineTo(g.sx(ch[f]),cy)}}
+    ctx.stroke();
+    // reconstructed-trait colours on internal branches
+    if(key){for(var i2=0;i2<nodes.length;i2++){var q=nodes[i2];if(q._leaf!=null||!q._p)continue;var cq=colorOf(q);if(!cq)continue;var yq=g.sy(q._y);if(yq<-4||yq>g.H+4)continue;
+      ctx.strokeStyle=cq;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(g.sx(q._p[f]),yq);ctx.lineTo(g.sx(q[f]),yq);ctx.stroke()}}
+    // pass 2: tips
+    var lw=Math.max(1,Math.min(3,rowPx*.8));
+    for(var k=0;k<V.leaves.length;k++){var l=V.leaves[k],y=g.sy(l._y);if(y<-6||y>g.H+6)continue;
+      var col=colorOf(l)||'#8FA1B3',on=match(l);ctx.globalAlpha=on?1:.12;
+      var x1=g.sx(l._p?l._p[f]:l[f]),x2=g.sx(l[f]);
+      ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke();
+      if(rowPx>=3){ctx.fillStyle=col;ctx.beginPath();ctx.arc(x2,y,Math.min(4.5,rowPx*.38),0,6.2832);ctx.fill()}}
+    ctx.globalAlpha=1;
+    if(V.found){V.found.slice(0,300).forEach(function(l){var y=g.sy(l._y),x=g.sx(l[f]);ctx.strokeStyle='#101D2D';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,7,0,6.2832);ctx.stroke()})}
+    if(V.pin){var pl=V.pin,py=g.sy(pl._y),px=g.sx(pl[f]);ctx.strokeStyle='#101D2D';ctx.lineWidth=2.2;ctx.beginPath();ctx.arc(px,py,8,0,6.2832);ctx.stroke()}
+    // axis
+    ctx.fillStyle='#FFFFFF';ctx.fillRect(0,g.H-M.b+4,g.W,M.b);ctx.strokeStyle='#DCE5EC';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,g.H-M.b+4.5);ctx.lineTo(g.W,g.H-M.b+4.5);ctx.stroke();
+    var lo=g.ix(M.l),hi=g.ix(g.W-M.r),step=niceStep(hi-lo,6),first=Math.ceil(lo/step)*step;
+    ctx.fillStyle='#64748B';ctx.font='11px sans-serif';ctx.textAlign='center';
+    for(var t=first;t<=hi+1e-9;t+=step){var tx=g.sx(t);ctx.beginPath();ctx.moveTo(tx,g.H-M.b+4);ctx.lineTo(tx,g.H-M.b+9);ctx.stroke();
+      ctx.fillText(V.axis==='date'?String(Math.round(t*10)/10):String(Math.round(t*1e4)/1e4),tx,g.H-6)}
+    ctx.textAlign='left';
+  }
+  // interaction
+  var drag=null;
+  cv.addEventListener('wheel',function(e){if(!V.nodes.length)return;e.preventDefault();
+    var r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,z=Math.exp(-e.deltaY*0.0015);
+    if(e.shiftKey||Math.abs(e.deltaX)>Math.abs(e.deltaY)){var nk=Math.max(1,Math.min(60,V.kx*z));V.tx=mx-(mx-V.tx)*(nk/V.kx);V.kx=nk}
+    else{var nky=Math.max(1,Math.min(400,V.ky*z));V.ty=my-(my-V.ty)*(nky/V.ky);V.ky=nky}
+    clamp();draw()},{passive:false});
+  function clamp(){var g=geom();V.ty=Math.min(0,Math.max(V.ty,g.H-M.b-M.t-(g.H-M.t-M.b)*V.ky-20));V.tx=Math.min(0,Math.max(V.tx,-(g.pw*(V.kx-1))-20))}
+  cv.addEventListener('pointerdown',function(e){if(!V.nodes.length)return;drag={x:e.clientX,y:e.clientY,tx:V.tx,ty:V.ty,moved:false};cv.setPointerCapture(e.pointerId);cv.classList.add('drag')});
+  cv.addEventListener('pointermove',function(e){
+    var r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    if(drag){var dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;V.tx=drag.tx+dx;V.ty=drag.ty+dy;clamp();draw();tip.style.display='none';return}
+    hoverAt(mx,my)});
+  cv.addEventListener('pointerup',function(e){cv.classList.remove('drag');var was=drag;drag=null;
+    if(was&&!was.moved){var r=cv.getBoundingClientRect(),l=tipAt(e.clientX-r.left,e.clientY-r.top);V.pin=l;pinPanel(l);draw()}});
+  cv.addEventListener('pointerleave',function(){tip.style.display='none'});
+  function tipAt(mx,my){if(!V.nodes.length)return null;var g=geom(),row=Math.round((my-M.t-V.ty)/(g.rowH*V.ky));
+    if(row<0||row>=V.leaves.length)return null;var l=V.leaves[row],dy=Math.abs(g.sy(l._y)-my);
+    if(dy>Math.max(7,g.rowH*V.ky/2+2))return null;if(mx<g.sx(l[V.xf])-55)return null;return l}
+  function attrsOf(l){var o=[];['subtype','country','year','study','treatment_context','sdrm_mutations','cluster'].forEach(function(k){var v=val(l,k);if(v!=null)o.push([k.replace(/_/g,' '),v])});return o}
+  function hoverAt(mx,my){var l=tipAt(mx,my);
+    if(!l){tip.style.display='none';return}
+    tip.innerHTML='<b>'+esc(l.name)+'</b><br>'+attrsOf(l).slice(0,5).map(function(a){return esc(a[0])+': '+esc(a[1])}).join('<br>');
+    tip.style.display='block';var w=cv.clientWidth;tip.style.left=Math.min(w-310,mx+14)+'px';tip.style.top=Math.max(4,my-10)+'px'}
+  function pinPanel(l){var el=$('#tvPin');if(!l){el.innerHTML='';return}
+    var muts=l.branch_attrs&&l.branch_attrs.mutations,nn=muts&&muts.nuc?muts.nuc.length:null;
+    el.innerHTML='<div class="callout"><strong>'+esc(l.name)+'</strong><table><tbody>'+attrsOf(l).map(function(a){return '<tr><td class="muted" style="width:11rem">'+esc(a[0])+'</td><td>'+esc(a[1])+'</td></tr>'}).join('')+
+      (V.hasDate&&l._xt!=null?'<tr><td class="muted">date</td><td>'+esc(Math.round(l._xt*100)/100)+'</td></tr>':'')+(nn!=null?'<tr><td class="muted">nucleotide changes on the terminal branch</td><td>'+nn+'</td></tr>':'')+'</tbody></table></div>'}
+
+  // loading
+  function parse(text,label){try{setTree(JSON.parse(text))}catch(err){msg('Could not read '+label+' as an Auspice JSON.')}}
+  var loadBtn=$('#tvLoad');
+  if(loadBtn)loadBtn.addEventListener('click',function(){var t=D.trees[+$('#tvTree').value];msg('Loading '+t.name+'…');
+    fetch(t.file).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text()}).then(function(x){parse(x,t.name)})
+      .catch(function(){msg('Could not fetch '+t.file+'. Browsers block this when the page is opened from a file; serve the folder over http (for example python -m http.server in the site folder) or choose the file below.')})});
+  $('#tvFile').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;msg('Reading '+f.name+'…');var r=new FileReader();r.onload=function(){parse(r.result,f.name)};r.readAsText(f)});
+  ['dragover','drop'].forEach(function(ev){cv.addEventListener(ev,function(e){e.preventDefault();if(ev==='drop'&&e.dataTransfer.files[0]){var f=e.dataTransfer.files[0],r=new FileReader();r.onload=function(){parse(r.result,f.name)};r.readAsText(f)}})});
+  resize();
+}
 
 /* ---------- limitations, references, footer ---------- */
 $('#limList').innerHTML=D.limitations.map(function(t){return '<li>'+esc(t)+'</li>'}).join('');
@@ -416,7 +598,7 @@ $('#refList').innerHTML=D.references.map(function(t){return '<li>'+esc(t)+'</li>
 var vs=Object.keys(D.list_versions).map(function(k){return (ROLE_LABEL[k]||k)+' '+D.list_versions[k]}).join('; ');
 $('#foot').innerHTML='Virotrace explorer, scope <code>'+esc(D.scope)+'</code>, generated '+esc(D.generated)+'. Mutation lists: '+esc(vs)+'. Minimum group size '+esc(D.min_stratum_n)+'. Aggregate tables only: no accessions or per-sequence rows are in this page. The same data is in <code>data.json</code>.';
 
-setRole(st.role);
+setRole(st.role);treeViewer();
 })();
 </script>
 </body></html>
